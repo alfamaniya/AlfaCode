@@ -6,6 +6,40 @@
   var split   = document.getElementById("split");
   var splitDiv = document.getElementById("splitDivider");
 
+  var viewModes = [
+    { key: "preview", buttonId: "togglePreview", attribute: "data-preview-visible" },
+    { key: "header", buttonId: "toggleHeader", attribute: "data-header-visible" },
+    { key: "footer", buttonId: "toggleFooter", attribute: "data-footer-visible" }
+  ];
+  var savedViewModes = load("alfa-code:view-modes", {});
+  if (!savedViewModes || typeof savedViewModes !== "object") savedViewModes = {};
+  viewModes.forEach(function (mode) {
+    var button = document.getElementById(mode.buttonId);
+    var visible = !Object.prototype.hasOwnProperty.call(savedViewModes, mode.key) ||
+      savedViewModes[mode.key] !== false;
+    var label = mode.key === "preview" ? "preview" : mode.key;
+    root.setAttribute(mode.attribute, visible ? "true" : "false");
+    if (button) {
+      button.setAttribute("aria-pressed", visible ? "true" : "false");
+      button.classList.toggle("is-active", visible);
+      button.setAttribute("aria-label", (visible ? "Hide " : "Show ") + label);
+      button.title = button.getAttribute("aria-label");
+      button.addEventListener("click", function () {
+        visible = !visible;
+        root.setAttribute(mode.attribute, visible ? "true" : "false");
+        button.setAttribute("aria-pressed", visible ? "true" : "false");
+        button.classList.toggle("is-active", visible);
+        button.setAttribute("aria-label", (visible ? "Hide " : "Show ") + label);
+        button.title = button.getAttribute("aria-label");
+        var current = load("alfa-code:view-modes", {});
+        if (!current || typeof current !== "object") current = {};
+        current[mode.key] = visible;
+        save("alfa-code:view-modes", current);
+        window.dispatchEvent(new Event("alfa-code:layout-change"));
+      });
+    }
+  });
+
   function load(key, fallback) {
     try {
       var v = localStorage.getItem(key);
@@ -764,6 +798,10 @@
     activateTab(event.detail && event.detail.tab);
   });
   window.addEventListener("resize", function () {
+    var editor = getCurrentEditor();
+    if (editor) editor.layout();
+  });
+  window.addEventListener("alfa-code:layout-change", function () {
     var editor = getCurrentEditor();
     if (editor) editor.layout();
   });

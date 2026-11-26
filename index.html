@@ -47,6 +47,9 @@
     <symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></symbol>
     <symbol id="i-panel-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
     <symbol id="i-panel-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol>
+    <symbol id="i-view-preview" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-view-header" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></symbol>
+    <symbol id="i-view-footer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18"/></symbol>
   </svg>
 
   <header class="header">
@@ -142,16 +145,29 @@
   <main class="main" id="main">
     <div class="split" id="split">
       <section class="pane left">
-        <div class="tabs" role="tablist" aria-label="Code tabs">
-          <button class="tab active" role="tab" data-tab="html" tabindex="0" aria-selected="true" aria-controls="panel-html" id="tab-html" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>HTML
-          </button>
-          <button class="tab" role="tab" data-tab="css" tabindex="-1" aria-selected="false" aria-controls="panel-css" id="tab-css" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>CSS
-          </button>
-          <button class="tab" role="tab" data-tab="js" tabindex="-1" aria-selected="false" aria-controls="panel-js" id="tab-js" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg>JS
-          </button>
+        <div class="editor-toolbar">
+          <div class="tabs" role="tablist" aria-label="Code tabs">
+            <button class="tab active" role="tab" data-tab="html" tabindex="0" aria-selected="true" aria-controls="panel-html" id="tab-html" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>HTML
+            </button>
+            <button class="tab" role="tab" data-tab="css" tabindex="-1" aria-selected="false" aria-controls="panel-css" id="tab-css" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>CSS
+            </button>
+            <button class="tab" role="tab" data-tab="js" tabindex="-1" aria-selected="false" aria-controls="panel-js" id="tab-js" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg>JS
+            </button>
+          </div>
+          <div class="view-modes" role="group" aria-label="View options">
+            <button class="view-mode is-active" id="togglePreview" type="button" aria-pressed="true" aria-label="Hide preview" title="Hide preview">
+              <svg class="icon" aria-hidden="true"><use href="#i-view-preview"/></svg>
+            </button>
+            <button class="view-mode is-active" id="toggleHeader" type="button" aria-pressed="true" aria-label="Hide header" title="Hide header">
+              <svg class="icon" aria-hidden="true"><use href="#i-view-header"/></svg>
+            </button>
+            <button class="view-mode is-active" id="toggleFooter" type="button" aria-pressed="true" aria-label="Hide footer" title="Hide footer">
+              <svg class="icon" aria-hidden="true"><use href="#i-view-footer"/></svg>
+            </button>
+          </div>
         </div>
         <div class="tab-content">
           <div class="tab-panel active" id="panel-html" role="tabpanel" aria-labelledby="tab-html">
