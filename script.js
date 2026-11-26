@@ -215,6 +215,9 @@
     panels.forEach(function (p) { p.classList.remove("active"); });
     var target = document.getElementById("panel-" + tab.dataset.tab);
     if (target) target.classList.add("active");
+    document.dispatchEvent(new CustomEvent("alfa-code:tab-change", {
+      detail: { tab: tab.dataset.tab }
+    }));
   }
   tabs.forEach(function (tab, index) {
     tab.addEventListener("click", function () { activateTab(tab); });
@@ -250,12 +253,15 @@
 (function () {
   "use strict";
 
-  var frame   = document.getElementById("previewFrame");
-  var taHtml  = document.querySelector("#panel-html textarea");
-  var taCss   = document.querySelector("#panel-css textarea");
-  var taJs    = document.querySelector("#panel-js textarea");
-  var importBtn  = document.getElementById("importBtn");
+  var frame = document.getElementById("previewFrame");
+  var importBtn = document.getElementById("importBtn");
   var importFile = document.getElementById("importFile");
+  var editorSwitch = document.getElementById("editorSwitch");
+  var editorName = document.getElementById("editorName");
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var tabKeys = ["html", "css", "js"];
+  var languageByTab = { html: "html", css: "css", js: "javascript" };
+  var engineNames = { monaco: "Monaco", codemirror6: "CodeMirror 6" };
 
   function showToast(msg, isError) {
     var container = document.getElementById("toastContainer");
@@ -271,12 +277,12 @@
     }, 2600);
   }
 
-  if (!frame || !taHtml || !taCss || !taJs) {
-    console.error("[Alfa-Code] Editor elements missing; aborting.");
+  if (!frame || !editorSwitch || !editorName || !window.CodeMirror6 || !window.require) {
+    console.error("[Alfa-Code] Editor assets or page elements are missing.");
+    showToast("Could not load the offline code editors.", true);
     return;
   }
 
-  /* ---------- Default demo content ---------- */
   var DEFAULT_HTML = [
     '<div class="demo-card">',
     '  <h1>Hello, Alfa-Code!</h1>',
@@ -320,83 +326,303 @@
     "});"
   ].join('\n');
 
-  /* ---------- Persistence ---------- */
   function load(key, fallback) {
     try {
-      var v = localStorage.getItem(key);
-      return v !== null ? JSON.parse(v) : fallback;
-    } catch (e) { return fallback; }
+      var value = localStorage.getItem(key);
+      return value !== null ? JSON.parse(value) : fallback;
+    } catch (error) {
+      return fallback;
+    }
   }
-  function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
   }
   function loadString(key, fallback) {
-    var v = load(key, null);
-    return typeof v === "string" ? v : fallback;
+    var value = load(key, null);
+    return typeof value === "string" ? value : fallback;
   }
 
-  taHtml.value = loadString("alfa-code:html", DEFAULT_HTML);
-  taCss.value  = loadString("alfa-code:css",  DEFAULT_CSS);
-  taJs.value   = loadString("alfa-code:js",   DEFAULT_JS);
-
+  var values = {
+    html: loadString("alfa-code:html", DEFAULT_HTML),
+    css: loadString("alfa-code:css", DEFAULT_CSS),
+    js: loadString("alfa-code:js", DEFAULT_JS)
+  };
+  var activeEngine = load("alfa-code:editor", "monaco");
+  if (!Object.prototype.hasOwnProperty.call(engineNames, activeEngine)) activeEngine = "monaco";
+  var activeTab = "html";
+  var instances = { monaco: {}, codemirror6: {} };
+  var selections = { monaco: {}, codemirror6: {} };
+  var monacoPromise = null;
+  var suppressChanges = false;
   var saveTimer = null;
+  var renderTimer = null;
+
   function persist() {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () {
-      save("alfa-code:html", taHtml.value);
-      save("alfa-code:css",  taCss.value);
-      save("alfa-code:js",   taJs.value);
-      saveTimer = null;
-    }, 400);
+    saveTimer = setTimeout(flushPersist, 400);
   }
   function flushPersist() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    save("alfa-code:html", taHtml.value);
-    save("alfa-code:css",  taCss.value);
-    save("alfa-code:js",   taJs.value);
+    tabKeys.forEach(function (key) { save("alfa-code:" + key, values[key]); });
+    save("alfa-code:editor", activeEngine);
   }
   window.addEventListener("beforeunload", flushPersist);
 
-  /* ---------- HTML / CSS / JS splitting ---------- */
-  function splitHTML(input) {
-    if (!input) return { html: '', css: '', js: '' };
+  function schedule() {
+    if (renderTimer) clearTimeout(renderTimer);
+    renderTimer = setTimeout(render, 250);
+  }
 
-    var styles  = [];
-    var scripts = [];
+  function getCurrentEditor() {
+    return instances[activeEngine][activeTab] || null;
+  }
 
+  function handleChange(key, value) {
+    if (suppressChanges) return;
+    values[key] = value;
+    persist();
+    schedule();
+  }
+
+  function saveSelection() {
+    var editor = getCurrentEditor();
+    if (editor) selections[activeEngine][activeTab] = editor.getSelection();
+  }
+
+  function syncEditorSurfaces() {
+    tabKeys.forEach(function (key) {
+      var panel = document.getElementById("panel-" + key);
+      if (panel) panel.classList.toggle("active", key === activeTab);
+      ["monaco", "codemirror6"].forEach(function (engine) {
+        var surface = document.getElementById("editor-" + key + "-" + engine);
+        if (surface) surface.classList.toggle("active", key === activeTab && engine === activeEngine);
+      });
+    });
+  }
+
+  function loadMonaco() {
+    if (monacoPromise) return monacoPromise;
+    monacoPromise = new Promise(function (resolve, reject) {
+      window.require.config({ paths: { vs: "./editors/monaco/vs" } });
+      window.require(["vs/editor/editor.main"], function () {
+        if (!window.monaco || !window.monaco.editor) {
+          reject(new Error("Monaco loaded without its editor API."));
+          return;
+        }
+        resolve(window.monaco);
+      }, reject);
+    });
+    return monacoPromise;
+  }
+
+  function createMonacoEditor(key, surface) {
+    return loadMonaco().then(function (monaco) {
+      var editor = monaco.editor.create(surface, {
+        value: values[key],
+        language: languageByTab[key],
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: true },
+        scrollBeyondLastLine: false,
+        wordWrap: "on",
+        tabSize: 2,
+        fontSize: 13,
+        fontFamily: 'Consolas, "Courier New", monospace',
+        roundedSelection: true,
+        renderLineHighlight: "line",
+        suggestOnTriggerCharacters: true,
+        quickSuggestions: true,
+        formatOnPaste: false
+      });
+      editor.onDidChangeModelContent(function () { handleChange(key, editor.getValue()); });
+      return {
+        getValue: function () { return editor.getValue(); },
+        setValue: function (value) { editor.setValue(value); },
+        getSelection: function () {
+          var selection = editor.getSelection();
+          var model = editor.getModel();
+          return selection && model ? {
+            from: model.getOffsetAt(selection.getStartPosition()),
+            to: model.getOffsetAt(selection.getEndPosition())
+          } : { from: 0, to: 0 };
+        },
+        setSelection: function (selection) {
+          var model = editor.getModel();
+          if (!model || !selection) return;
+          editor.setSelection({
+            startLineNumber: model.getPositionAt(selection.from).lineNumber,
+            startColumn: model.getPositionAt(selection.from).column,
+            endLineNumber: model.getPositionAt(selection.to).lineNumber,
+            endColumn: model.getPositionAt(selection.to).column
+          });
+        },
+        replaceSelection: function (text) {
+          var range = editor.getSelection();
+          if (range) editor.executeEdits("alfa-code-paste", [{ range: range, text: text, forceMoveMarkers: true }]);
+        },
+        focus: function () { editor.focus(); },
+        layout: function () { editor.layout(); },
+        undo: function () { editor.trigger("alfa-code", "undo", null); },
+        redo: function () { editor.trigger("alfa-code", "redo", null); },
+        find: function () {
+          var action = editor.getAction("actions.find");
+          if (action) action.run();
+        }
+      };
+    });
+  }
+
+  function createCodeMirrorEditor(key, surface) {
+    var CodeMirror6 = window.CodeMirror6;
+    var language = key === "html" ? CodeMirror6.html :
+      (key === "css" ? CodeMirror6.css : CodeMirror6.javascript);
+    var editor = new CodeMirror6.EditorView({
+      doc: values[key],
+      extensions: [
+        CodeMirror6.basicSetup,
+        language(),
+        CodeMirror6.EditorView.lineWrapping,
+        CodeMirror6.EditorView.updateListener.of(function (update) {
+          if (update.docChanged) handleChange(key, update.state.doc.toString());
+        })
+      ],
+      parent: surface
+    });
+    return {
+      getValue: function () { return editor.state.doc.toString(); },
+      setValue: function (value) {
+        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: value } });
+      },
+      getSelection: function () {
+        var range = editor.state.selection.main;
+        return { from: range.from, to: range.to };
+      },
+      setSelection: function (selection) {
+        if (selection) editor.dispatch({ selection: { anchor: selection.from, head: selection.to } });
+      },
+      replaceSelection: function (text) {
+        var range = editor.state.selection.main;
+        editor.dispatch({
+          changes: { from: range.from, to: range.to, insert: text },
+          selection: { anchor: range.from + text.length }
+        });
+      },
+      focus: function () { editor.focus(); },
+      layout: function () { editor.requestMeasure(); },
+      undo: function () { CodeMirror6.undo(editor); },
+      redo: function () { CodeMirror6.redo(editor); },
+      find: function () { CodeMirror6.openSearchPanel(editor); }
+    };
+  }
+
+  function ensureEditor(engine, key) {
+    if (instances[engine][key]) return Promise.resolve(instances[engine][key]);
+    var surface = document.getElementById("editor-" + key + "-" + engine);
+    if (!surface) return Promise.reject(new Error("Missing editor surface for " + key + "."));
+    var created = engine === "monaco"
+      ? createMonacoEditor(key, surface)
+      : Promise.resolve(createCodeMirrorEditor(key, surface));
+    return created.then(function (editor) {
+      instances[engine][key] = editor;
+      var selection = selections[engine][key];
+      if (selection) editor.setSelection(selection);
+      editor.layout();
+      return editor;
+    });
+  }
+
+  function syncExistingEditors() {
+    suppressChanges = true;
     try {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(input, 'text/html');
-      var styleNodes = doc.querySelectorAll('style');
-      for (var i = 0; i < styleNodes.length; i++) {
-        var t = styleNodes[i].textContent;
-        if (t && t.trim()) styles.push(t);
-      }
-      var scriptNodes = doc.querySelectorAll('script');
-      for (var j = 0; j < scriptNodes.length; j++) {
-        var s = scriptNodes[j];
-        if (!s.src && s.textContent && s.textContent.trim()) scripts.push(s.textContent);
-      }
-    } catch (e) {
-      console.warn("[Alfa-Code] DOMParser split failed, using regex only:", e);
+      ["monaco", "codemirror6"].forEach(function (engine) {
+        tabKeys.forEach(function (key) {
+          var editor = instances[engine][key];
+          if (editor && editor.getValue() !== values[key]) editor.setValue(values[key]);
+        });
+      });
+    } finally {
+      suppressChanges = false;
     }
+  }
 
+  function setValues(nextValues) {
+    tabKeys.forEach(function (key) {
+      if (typeof nextValues[key] === "string") values[key] = nextValues[key];
+    });
+    syncExistingEditors();
+    persist();
+    schedule();
+  }
+
+  function activateTab(key) {
+    if (tabKeys.indexOf(key) === -1) return;
+    saveSelection();
+    activeTab = key;
+    syncEditorSurfaces();
+    ensureEditor(activeEngine, activeTab).then(function (editor) {
+      editor.layout();
+    }).catch(function (error) {
+      console.error("[Alfa-Code] Could not initialize editor:", error);
+      showToast("Could not initialize " + engineNames[activeEngine] + ": " + error.message, true);
+    });
+  }
+
+  function updateSwitchButton() {
+    var nextEngine = activeEngine === "monaco" ? "codemirror6" : "monaco";
+    editorName.textContent = engineNames[activeEngine];
+    editorSwitch.setAttribute("aria-label", "Switch editor to " + engineNames[nextEngine]);
+    editorSwitch.title = "Switch to " + engineNames[nextEngine];
+  }
+
+  function switchEditor() {
+    var nextEngine = activeEngine === "monaco" ? "codemirror6" : "monaco";
+    saveSelection();
+    if (getCurrentEditor()) values[activeTab] = getCurrentEditor().getValue();
+    syncExistingEditors();
+    ensureEditor(nextEngine, activeTab).then(function () {
+      activeEngine = nextEngine;
+      save("alfa-code:editor", activeEngine);
+      updateSwitchButton();
+      syncEditorSurfaces();
+      var editor = getCurrentEditor();
+      editor.layout();
+      editor.focus();
+    }).catch(function (error) {
+      console.error("[Alfa-Code] Could not switch editor:", error);
+      showToast("Could not switch to " + engineNames[nextEngine] + ": " + error.message, true);
+    });
+  }
+
+  function splitHTML(input) {
+    if (!input) return { html: "", css: "", js: "" };
+    var styles = [];
+    var scripts = [];
+    try {
+      var doc = new DOMParser().parseFromString(input, "text/html");
+      doc.querySelectorAll("style").forEach(function (node) {
+        if (node.textContent && node.textContent.trim()) styles.push(node.textContent);
+      });
+      doc.querySelectorAll("script").forEach(function (node) {
+        if (!node.src && node.textContent && node.textContent.trim()) scripts.push(node.textContent);
+      });
+    } catch (error) {
+      console.warn("[Alfa-Code] DOMParser split failed, using regex only:", error);
+    }
     var html = input
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
       .replace(/<script\b([^>]*)>[\s\S]*?<\/script>/gi, function (match, attrs) {
-        return /\bsrc\s*=/i.test(attrs) ? match : '';
+        return /\bsrc\s*=/i.test(attrs) ? match : "";
       })
       .replace(/<script\b[^>]*\/>/gi, function (match) {
-        return /\bsrc\s*=/i.test(match) ? match : '';
+        return /\bsrc\s*=/i.test(match) ? match : "";
       })
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
-
     return {
       html: html,
-      css:  styles.map(function (s) { return s.trim(); }).join('\n\n'),
-      js:   scripts.map(function (s) { return s.trim(); }).join('\n\n')
+      css: styles.map(function (style) { return style.trim(); }).join("\n\n"),
+      js: scripts.map(function (script) { return script.trim(); }).join("\n\n")
     };
   }
 
@@ -404,102 +630,58 @@
     return /<!doctype\s+html/i.test(text) || /<html[\s>]/i.test(text);
   }
 
-  /* ---------- Render preview (BUG FIXED HERE) ---------- */
-  /*
-   * روش قبلی با Regex تلاش می‌کرد <style> را در <head> تزریق کند، اما اگر
-   * سند HTML دارای DOCTYPE بود و تگ <html> یا <head> نداشت (مثل
-   * <!DOCTYPE html><body>...</body>)، هیچ تطابقی پیدا نمی‌شد و CSS از دست
-   * می‌رفت. راه‌حل: با DOMParser سند را نرمال می‌کنیم و سپس style/script را
-   * در جای درست به درخت DOM اضافه می‌کنیم.
-   */
   function buildDocument() {
-    var html = taHtml.value || '';
-    var css  = taCss.value  || '';
-    var js   = taJs.value   || '';
-
-    // Escape closing tags so the parser doesn't close the outer <style>/<script>
-    var safeCss = css.replace(/<\/style/gi, '<\\/style');
-    var safeJs  = js.replace(/<\/script/gi, '<\\/script');
-
-    // Normalize HTML into a full document (adds <html>/<head>/<body> if missing)
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
-
-    // Ensure charset
-    if (!doc.querySelector('meta[charset]')) {
-      var metaCharset = doc.createElement('meta');
-      metaCharset.setAttribute('charset', 'utf-8');
+    var safeCss = values.css.replace(/<\/style/gi, "<\\/style");
+    var safeJs = values.js.replace(/<\/script/gi, "<\\/script");
+    var doc = new DOMParser().parseFromString(values.html, "text/html");
+    if (!doc.querySelector("meta[charset]")) {
+      var metaCharset = doc.createElement("meta");
+      metaCharset.setAttribute("charset", "utf-8");
       doc.head.insertBefore(metaCharset, doc.head.firstChild);
     }
-    // Ensure viewport
     if (!doc.querySelector('meta[name="viewport"]')) {
-      var metaViewport = doc.createElement('meta');
-      metaViewport.setAttribute('name', 'viewport');
-      metaViewport.setAttribute('content', 'width=device-width,initial-scale=1');
+      var metaViewport = doc.createElement("meta");
+      metaViewport.setAttribute("name", "viewport");
+      metaViewport.setAttribute("content", "width=device-width,initial-scale=1");
       doc.head.appendChild(metaViewport);
     }
-
-    // Inject CSS into <head>
-    var styleEl = doc.createElement('style');
-    styleEl.textContent = safeCss;
-    doc.head.appendChild(styleEl);
-
-    // Inject JS at end of <body>
-    var scriptEl = doc.createElement('script');
-    scriptEl.textContent = safeJs;
-    doc.body.appendChild(scriptEl);
-
-    return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+    var style = doc.createElement("style");
+    style.textContent = safeCss;
+    doc.head.appendChild(style);
+    var script = doc.createElement("script");
+    script.textContent = safeJs;
+    doc.body.appendChild(script);
+    return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
   }
 
-  var timer = null;
   function render() {
+    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     frame.srcdoc = buildDocument();
   }
-  function schedule() {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(render, 250);
-  }
 
-  [taHtml, taCss, taJs].forEach(function (ta) {
-    ta.addEventListener("input", function () { schedule(); persist(); });
-  });
-
-  /* ---------- Import: apply a full HTML file's content ---------- */
   function applyImportedFile(text, fileName) {
-    console.log("[Alfa-Code] Importing file:", fileName || "(pasted)");
     var parts = splitHTML(text);
-
-    taHtml.value = parts.html || '';
-    taCss.value  = parts.css  || '';
-    taJs.value   = parts.js   || '';
-    persist();
-    render();
-
+    setValues(parts);
     var htmlTab = document.getElementById("tab-html");
     if (htmlTab) htmlTab.click();
-
     var summary = "Imported" + (fileName ? " " + fileName : "") + " — ";
-    var parts_list = [];
-    if (parts.css)  parts_list.push("CSS: " + parts.css.length + " chars");
-    if (parts.js)   parts_list.push("JS: " + parts.js.length + " chars");
-    parts_list.push("HTML: " + parts.html.length + " chars");
-    showToast(summary + parts_list.join(" · "));
+    var details = [];
+    if (parts.css) details.push("CSS: " + parts.css.length + " chars");
+    if (parts.js) details.push("JS: " + parts.js.length + " chars");
+    details.push("HTML: " + parts.html.length + " chars");
+    showToast(summary + details.join(" · "));
   }
 
   if (importFile) {
-    importFile.addEventListener("change", function (e) {
-      console.log("[Alfa-Code] File input change fired");
-      var file = e.target.files && e.target.files[0];
+    importFile.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
       if (!file) return;
-
       var reader = new FileReader();
       reader.onload = function () {
-        try {
-          applyImportedFile(String(reader.result || ""), file.name);
-        } catch (err) {
-          console.error("[Alfa-Code] Import failed:", err);
-          showToast("Import failed: " + (err && err.message ? err.message : "unknown error"), true);
+        try { applyImportedFile(String(reader.result || ""), file.name); }
+        catch (error) {
+          console.error("[Alfa-Code] Import failed:", error);
+          showToast("Import failed: " + (error.message || "unknown error"), true);
         }
       };
       reader.onerror = function () {
@@ -507,88 +689,131 @@
         showToast("Could not read the file.", true);
       };
       reader.readAsText(file);
-
-      // Allow re-importing the same file
-      e.target.value = "";
+      event.target.value = "";
     });
   }
 
   if (importBtn && importFile) {
-    importBtn.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
-        e.preventDefault();
+    importBtn.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
         importBtn.click();
       }
     });
-    importBtn.addEventListener("click", function () {
-      console.log("[Alfa-Code] Import button clicked (dialog should open)");
-    });
   }
 
-  /* ---------- Paste: auto-split full HTML ---------- */
-  taHtml.addEventListener("paste", function (e) {
-    var cd = e.clipboardData || window.clipboardData;
-    if (!cd) return;
-    var text = cd.getData("text/plain");
+  function pasteFullDocument(event) {
+    var clipboard = event.clipboardData || window.clipboardData;
+    if (!clipboard) return;
+    var text = clipboard.getData("text/plain");
     if (!text || !looksLikeFullDocument(text)) return;
-
-    e.preventDefault();
-
+    event.preventDefault();
+    event.stopPropagation();
     var parts = splitHTML(text);
-
-    var start = taHtml.selectionStart;
-    var end   = taHtml.selectionEnd;
-    var before = taHtml.value.substring(0, start);
-    var after  = taHtml.value.substring(end);
-    var inserted = parts.html;
-    taHtml.value = before + inserted + after;
-    var newPos = before.length + inserted.length;
-    taHtml.selectionStart = taHtml.selectionEnd = newPos;
-
-    if (parts.css) {
-      taCss.value = taCss.value ? (taCss.value.replace(/\s+$/, '') + '\n\n' + parts.css) : parts.css;
-    }
-    if (parts.js) {
-      taJs.value = taJs.value ? (taJs.value.replace(/\s+$/, '') + '\n\n' + parts.js) : parts.js;
-    }
-
+    var editor = getCurrentEditor();
+    if (editor) editor.replaceSelection(parts.html);
+    values.html = editor ? editor.getValue() : parts.html;
+    if (parts.css) values.css = values.css ? values.css.replace(/\s+$/, "") + "\n\n" + parts.css : parts.css;
+    if (parts.js) values.js = values.js ? values.js.replace(/\s+$/, "") + "\n\n" + parts.js : parts.js;
+    syncExistingEditors();
     persist();
     render();
     showToast("Pasted HTML split — CSS & JS moved to their tabs");
+  }
+
+  var htmlHost = document.getElementById("editor-host-html");
+  if (htmlHost) {
+    htmlHost.addEventListener("paste", pasteFullDocument, true);
+    ["dragover", "dragenter"].forEach(function (type) {
+      htmlHost.addEventListener(type, function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var surface = event.target.closest(".editor-surface");
+        if (surface) surface.classList.add("is-dragover");
+      });
+    });
+    ["dragleave", "dragend"].forEach(function (type) {
+      htmlHost.addEventListener(type, function (event) {
+        var surface = event.target.closest(".editor-surface");
+        if (surface) surface.classList.remove("is-dragover");
+      });
+    });
+    htmlHost.addEventListener("drop", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      htmlHost.querySelectorAll(".editor-surface").forEach(function (surface) {
+        surface.classList.remove("is-dragover");
+      });
+      var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try { applyImportedFile(String(reader.result || ""), file.name); }
+        catch (error) {
+          console.error("[Alfa-Code] Drop import failed:", error);
+          showToast("Could not import dropped file.", true);
+        }
+      };
+      reader.onerror = function () { showToast("Could not read the dropped file.", true); };
+      reader.readAsText(file);
+    });
+  }
+
+  editorSwitch.addEventListener("click", switchEditor);
+  document.addEventListener("alfa-code:tab-change", function (event) {
+    activateTab(event.detail && event.detail.tab);
+  });
+  window.addEventListener("resize", function () {
+    var editor = getCurrentEditor();
+    if (editor) editor.layout();
   });
 
-  /* ---------- Drag & drop an HTML file onto the HTML textarea ---------- */
-  ["dragover", "dragenter"].forEach(function (evt) {
-    taHtml.addEventListener(evt, function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      taHtml.classList.add("is-dragover");
-    });
+  var undoButton = document.querySelector('[aria-label="Undo"]');
+  var redoButton = document.querySelector('[aria-label="Redo"]');
+  var searchButton = document.querySelector('[aria-label="Search"]');
+  if (undoButton) undoButton.addEventListener("click", function () {
+    var editor = getCurrentEditor();
+    if (editor) editor.undo();
   });
-  ["dragleave", "dragend"].forEach(function (evt) {
-    taHtml.addEventListener(evt, function () {
-      taHtml.classList.remove("is-dragover");
-    });
+  if (redoButton) redoButton.addEventListener("click", function () {
+    var editor = getCurrentEditor();
+    if (editor) editor.redo();
   });
-  taHtml.addEventListener("drop", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    taHtml.classList.remove("is-dragover");
-    var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function () {
-      try { applyImportedFile(String(reader.result || ""), file.name); }
-      catch (err) {
-        console.error("[Alfa-Code] Drop import failed:", err);
-        showToast("Could not import dropped file.", true);
-      }
-    };
-    reader.onerror = function () { showToast("Could not read the dropped file.", true); };
-    reader.readAsText(file);
+  if (searchButton) searchButton.addEventListener("click", function () {
+    var editor = getCurrentEditor();
+    if (editor) { editor.find(); editor.focus(); }
   });
 
-  /* ---------- Initial render ---------- */
-  render();
-  console.log("[Alfa-Code] Editor initialized");
+  var downloadButton = document.querySelector('[aria-label="Download"]');
+  if (downloadButton) downloadButton.addEventListener("click", function () {
+    var blob = new Blob([buildDocument()], { type: "text/html;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "alfa-code.html";
+    link.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  });
+
+  var clearButton = document.querySelector('[aria-label="Clear all tabs"]');
+  if (clearButton) clearButton.addEventListener("click", function () {
+    setValues({ html: "", css: "", js: "" });
+    showToast("All editor tabs cleared");
+  });
+
+  var resetButton = document.querySelector('[aria-label="Factory reset"]');
+  if (resetButton) resetButton.addEventListener("click", function () {
+    setValues({ html: DEFAULT_HTML, css: DEFAULT_CSS, js: DEFAULT_JS });
+    showToast("Editor content restored to defaults");
+  });
+
+  syncEditorSurfaces();
+  updateSwitchButton();
+  ensureEditor(activeEngine, activeTab).then(function () {
+    render();
+    console.log("[Alfa-Code] " + engineNames[activeEngine] + " editor initialized");
+  }).catch(function (error) {
+    console.error("[Alfa-Code] Could not initialize editor:", error);
+    showToast("Could not initialize " + engineNames[activeEngine] + ": " + error.message, true);
+  });
 })();

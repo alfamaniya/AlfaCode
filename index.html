@@ -77,6 +77,11 @@
       <button class="btn btn--header btn--header-wide" type="button" aria-label="Search" title="Search">
         <svg class="icon" aria-hidden="true"><use href="#i-search-code"/></svg><span class="btn-label">Search</span>
       </button>
+      <button class="btn btn--header btn--editor-switch" id="editorSwitch" type="button"
+              aria-label="Switch editor to CodeMirror 6" title="Switch to CodeMirror 6">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>
+        <span class="btn-label">Editor: <span id="editorName">Monaco</span></span>
+      </button>
       <button class="btn btn--header" type="button" aria-label="Settings" title="Settings">
         <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="btn-label">Settings</span>
       </button>
@@ -150,13 +155,22 @@
         </div>
         <div class="tab-content">
           <div class="tab-panel active" id="panel-html" role="tabpanel" aria-labelledby="tab-html">
-            <textarea spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Write your HTML here, or paste/drop a full HTML document to auto-split style/script..."></textarea>
+            <div class="editor-host" id="editor-host-html">
+              <div class="editor-surface editor-surface--monaco active" id="editor-html-monaco"></div>
+              <div class="editor-surface editor-surface--codemirror6" id="editor-html-codemirror6"></div>
+            </div>
           </div>
           <div class="tab-panel" id="panel-css" role="tabpanel" aria-labelledby="tab-css">
-            <textarea spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Write your CSS here..."></textarea>
+            <div class="editor-host" id="editor-host-css">
+              <div class="editor-surface editor-surface--monaco active" id="editor-css-monaco"></div>
+              <div class="editor-surface editor-surface--codemirror6" id="editor-css-codemirror6"></div>
+            </div>
           </div>
           <div class="tab-panel" id="panel-js" role="tabpanel" aria-labelledby="tab-js">
-            <textarea spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Write your JavaScript here..."></textarea>
+            <div class="editor-host" id="editor-host-js">
+              <div class="editor-surface editor-surface--monaco active" id="editor-js-monaco"></div>
+              <div class="editor-surface editor-surface--codemirror6" id="editor-js-codemirror6"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -210,6 +224,8 @@
 
 
 
+  <script src="editors/codemirror6/codemirror.js"></script>
+  <script src="editors/monaco/vs/loader.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -24,7 +24,10 @@ var CodeMirror6 = (() => {
     basicSetup: () => basicSetup,
     css: () => css,
     html: () => html,
-    javascript: () => javascript
+    javascript: () => javascript,
+    openSearchPanel: () => openSearchPanel,
+    redo: () => redo,
+    undo: () => undo
   });
 
   // ../../.copilot/session-state/136a6c2a-6434-4e0e-afea-011f3b3a718a/files/editor-build/node_modules/@marijn/find-cluster-break/src/index.js

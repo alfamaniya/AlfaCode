@@ -539,27 +539,83 @@
   }
   .tab-panel.active{ display: block; }
 
-  .tab-panel textarea{
+  .editor-host{
+    position: relative;
     width: 100%;
     height: 100%;
-    background: var(--c-textarea);
-    color: var(--c-turquoise);
-    border: 0;
+    overflow: hidden;
     border-radius: var(--r-md);
-    padding: 14px;
-    font-family: Consolas, "Courier New", Monaco, "Liberation Mono", monospace;
-    font-size: 13px;
-    line-height: 1.6;
-    resize: none;
-    outline: none;
     box-shadow: var(--sh-b);
-    transition: box-shadow .16s;
   }
-  .tab-panel textarea:focus{
+  .editor-surface{
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--c-textarea);
+  }
+  .editor-surface.active{ display: block; }
+  .editor-surface.is-dragover{
+    box-shadow: inset 0 0 0 2px var(--c-turquoise), var(--sh-glow);
+  }
+  .editor-surface--monaco .monaco-editor,
+  .editor-surface--monaco .overflow-guard{
+    border-radius: var(--r-md);
+  }
+  .editor-surface--codemirror6 .cm-editor{
+    width: 100%;
+    height: 100%;
+    color: var(--c-text);
+    background: var(--c-textarea);
+    font: 13px/1.6 Consolas, "Courier New", Monaco, "Liberation Mono", monospace;
+  }
+  .editor-surface--codemirror6 .cm-scroller{ overflow: auto; }
+  .editor-surface--codemirror6 .cm-gutters{
+    color: var(--c-muted);
+    background: var(--c-panel-deep);
+    border-right: 1px solid var(--c-border);
+  }
+  .editor-surface--codemirror6 .cm-activeLine,
+  .editor-surface--codemirror6 .cm-activeLineGutter{
+    background: var(--c-tint-05);
+  }
+  .editor-surface--codemirror6 .cm-cursor,
+  .editor-surface--codemirror6 .cm-dropCursor{
+    border-left-color: var(--c-turquoise);
+  }
+  .editor-surface--codemirror6 .cm-selectionBackground,
+  .editor-surface--codemirror6 .cm-content ::selection{
+    background: rgba(69, 216, 232, .28) !important;
+  }
+  .editor-surface--codemirror6 .cm-tooltip{
+    color: var(--c-text);
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+  }
+  .editor-surface--codemirror6 .cm-tooltip-autocomplete ul li[aria-selected]{
+    color: var(--c-text);
+    background: var(--c-tint-14);
+  }
+  .editor-surface--codemirror6 .cm-search{
+    padding: 8px;
+    color: var(--c-text);
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+  }
+  .editor-surface--codemirror6 .cm-search input{
+    color: var(--c-text);
+    background: var(--c-textarea);
+    border: 1px solid var(--c-border);
+  }
+  .editor-surface--codemirror6 .cm-search button{
+    color: var(--c-text);
+    background: var(--c-editor);
+    border: 1px solid var(--c-border);
+  }
+  .editor-host:focus-within{
     box-shadow: var(--sh-b-accent), var(--sh-glow-soft);
-  }
-  .tab-panel textarea.is-dragover{
-    box-shadow: var(--sh-b-accent), var(--sh-glow);
   }
 
   .preview-header{
