@@ -81,6 +81,7 @@
         visualGroupTitle.setAttribute("data-visual-group", button.getAttribute("data-visual-group") || "");
         visualGroups.hidden = true;
         visualGroupDetail.hidden = false;
+        visualGroupBack.hidden = false;
         if (window.AlfaCodeVisualProperties) {
           window.AlfaCodeVisualProperties.bind(visualGroupDetail, visualGroupTitle, visualGroups, frame);
         }
@@ -88,6 +89,7 @@
       visualGroupBack.addEventListener("click", function () {
         visualGroupDetail.hidden = true;
         visualGroups.hidden = false;
+        visualGroupBack.hidden = true;
       });
     }
 
@@ -140,6 +142,7 @@
         visualSelection.textContent = "No element selected";
         if (visualGroupDetail) visualGroupDetail.hidden = true;
         if (visualGroups) visualGroups.hidden = false;
+        if (visualGroupBack) visualGroupBack.hidden = true;
         sendVisualMode();
         document.dispatchEvent(new Event("alfa-code:visual-mode-exit"));
       }

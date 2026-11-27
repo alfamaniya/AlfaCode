@@ -144,9 +144,16 @@
     </div>
     <div class="visual-inspector" id="visualInspector" aria-live="polite">
       <p class="visual-inspector__hint">Select an element in the preview to edit its appearance.</p>
-      <p class="visual-inspector__selection" id="visualInspectorSelection">No element selected</p>
-      <button class="visual-mode-exit" id="visualModeExit" type="button">Exit visual mode</button>
-      <div class="visual-groups" id="visualGroups" aria-label="Visual setting groups">
+      <header class="visual-inspector__header">
+        <div class="visual-inspector__actions">
+          <button class="visual-mode-exit" id="visualModeExit" type="button">Exit visual mode</button>
+          <button class="visual-group-back" id="visualGroupBack" type="button" hidden>All groups</button>
+        </div>
+        <p class="visual-inspector__selection" id="visualInspectorSelection">No element selected</p>
+      </header>
+      <div class="visual-inspector__content">
+        <div class="visual-groups" id="visualGroups" aria-label="Visual setting groups">
+        <button class="visual-group" type="button" data-visual-group="custom-settings" aria-label="Custom Settings" data-tooltip="Custom Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="visual-group-label" aria-hidden="true">Custom Settings</span></button>
         <button class="visual-group" type="button" data-visual-group="layout" aria-label="Display &amp; Flow" data-tooltip="Display &amp; Flow"><svg class="icon" aria-hidden="true"><use href="#i-layout-dashboard"/></svg><span class="visual-group-label" aria-hidden="true">Display &amp; Flow</span></button>
         <button class="visual-group" type="button" data-visual-group="positioning" aria-label="Positioning" data-tooltip="Positioning"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg><span class="visual-group-label" aria-hidden="true">Positioning</span></button>
         <button class="visual-group" type="button" data-visual-group="flexbox" aria-label="Flexbox" data-tooltip="Flexbox"><svg class="icon" aria-hidden="true"><use href="#i-workflow"/></svg><span class="visual-group-label" aria-hidden="true">Flexbox</span></button>
@@ -179,12 +186,12 @@
         <button class="visual-group" type="button" data-visual-group="logical" aria-label="Logical Properties" data-tooltip="Logical Properties"><svg class="icon" aria-hidden="true"><use href="#i-workflow"/></svg><span class="visual-group-label" aria-hidden="true">Logical</span></button>
         <button class="visual-group" type="button" data-visual-group="accessibility" aria-label="Accessibility &amp; Motion" data-tooltip="Accessibility &amp; Motion"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="visual-group-label" aria-hidden="true">Accessibility</span></button>
         <button class="visual-group" type="button" data-visual-group="view-transitions" aria-label="View Transitions" data-tooltip="View Transitions"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg><span class="visual-group-label" aria-hidden="true">View Transitions</span></button>
+        </div>
+        <section class="visual-group-detail" id="visualGroupDetail" hidden aria-live="polite">
+          <h3 id="visualGroupTitle" data-visual-detail-title></h3>
+          <div class="visual-property-controls" data-visual-detail-controls></div>
+        </section>
       </div>
-      <section class="visual-group-detail" id="visualGroupDetail" hidden aria-live="polite">
-        <button class="visual-group-back" id="visualGroupBack" type="button">All groups</button>
-        <h3 id="visualGroupTitle" data-visual-detail-title></h3>
-        <div class="visual-property-controls" data-visual-detail-controls></div>
-      </section>
     </div>
     <ul class="sidebar-nav">
       <li><a href="#" title="Home"><svg class="icon nav-icon" aria-hidden="true"><use href="#i-house"/></svg><span class="nav-label">Home</span></a></li>
@@ -458,6 +465,7 @@
   <script src="js/visual/groups/forms.js"></script>
   <script src="js/visual/groups/containment.js"></script>
   <script src="js/visual/groups/custom-properties.js"></script>
+  <script src="js/visual/groups/custom-settings.js"></script>
   <script src="js/visual/groups/responsive.js"></script>
   <script src="js/visual/groups/svg.js"></script>
   <script src="js/visual/groups/logical.js"></script>
