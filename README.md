@@ -1,3 +1,4 @@
+https://github.com/alfamaniya/AlfaCode/blob/main/visual%20mode.md
 # آلفاکد (AlfaCode)
 
 آلفاکد یک محیط سبک برای نوشتن و اجرای نمونه‌های HTML، CSS و JavaScript در مرورگر است. رابط کاربری با HTML، CSS و JavaScript خام ساخته شده و کتابخانه‌های ویرایشگر را از نسخه‌های محلی داخل مخزن بارگذاری می‌کند؛ برای استفاده به CDN یا نصب بسته‌های npm نیاز ندارد.
