@@ -465,6 +465,7 @@
   function saveVisualEditState() {
     auxiliaryDirty.visualEdits = true;
     auxiliaryDirty.visualGeneratedRules = true;
+    persist();
   }
 
   function migrateLegacyVisualCss() {
