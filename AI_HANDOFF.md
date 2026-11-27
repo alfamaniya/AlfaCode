@@ -410,3 +410,294 @@ A change is complete only when:
 ---
 
 **Handoff ends here.** Continue from the current repository state, verify before assuming, and prefer small tested fixes over speculative rewrites.
+
+
+## 10. Comprehensive Visual Editor review
+
+This section records a focused static review of the Visual Editor implementation on the repository's `main` branch. Files inspected included:
+
+- `js/editor/visual-inspector.js`
+- `js/editor/preview-document.js`
+- `js/editor/visual-fullscreen.js`
+- `js/editor/controller.js`
+- `js/visual/visual-properties.js`
+- `js/visual/visual-catalog.js`
+- `js/visual/groups/*.js`
+- `index.html`
+- related CSS and script-loading order
+
+**Review limitation:** This was a source-level review. No real-browser execution, visual regression, or end-to-end test of every control was performed. Findings described as code defects below are based on the inspected implementation; feature gaps and edge cases still require runtime verification.
+
+### 10.1 Visual Editor structure observed
+
+The application declares 33 Visual Editor groups in `index.html`:
+
+1. Color & Background (`color-background`)
+2. Spacing
+3. Typography
+4. Custom Settings
+5. Layout
+6. Sizing
+7. Border & Outline
+8. Flexbox
+9. Grid
+10. Positioning
+11. Text
+12. Shadow
+13. Effects
+14. Transform
+15. Responsive
+16. Interaction
+17. Visibility
+18. Overflow
+19. Forms
+20. Columns
+21. Containment
+22. Custom Properties
+23. Transition
+24. Scroll Snap
+25. List
+26. Table
+27. States
+28. Content
+29. SVG
+30. Logical
+31. Masking
+32. Accessibility
+33. View Transitions
+
+The presence of a group in the UI does not prove that it provides a complete editor for the corresponding CSS feature. In particular, Responsive, States, animation, and pseudo-element workflows have important limitations described below.
+
+### 10.2 Confirmed implementation defects and high-confidence issues
+
+#### VE-01 — Selection state is not fully cleared when leaving Visual Mode
+
+The exit path resets `selectedLabel`, but the controller's `visualSelector` is retained. Re-entering Visual Mode can therefore leave a stale selector referring to the previously selected element.
+
+**Expected behavior:** Exiting Visual Mode must clear all selection-related state, including the selected label, selector, and any pending selection/computed-style request. Re-entering must start with no element selected.
+
+#### VE-02 — Preview reload leaves stale selection state
+
+The preview iframe load handler resets the visible selection label but does not fully clear the controller's selected selector/selection state. The old selector can survive a document reload even though the old DOM node no longer exists.
+
+**Expected behavior:** On every preview document replacement/load, invalidate the previous selection and pending requests. Do not allow controls to target a stale element.
+
+#### VE-03 — Selecting a new element does not reliably refresh an already-open inspector
+
+When a property group is open, selecting another preview element updates the selected label/selector, but the controls can continue showing computed values from the previously selected element.
+
+**Expected behavior:** A new selection must trigger a complete refresh of all visible inspector controls and computed values. The displayed values must correspond to the currently selected element only.
+
+#### VE-04 — Computed-style responses are vulnerable to out-of-order delivery
+
+Computed-style requests do not carry a robust request/selection identity. If the user selects elements quickly, a delayed response for an earlier selection can update controls after a newer selection has already occurred.
+
+**Expected behavior:** Add monotonically increasing request IDs and a selection/document generation ID to requests and responses. Ignore any response that does not match the latest active selection and preview document generation.
+
+#### VE-05 — Inspector controls can be used without a selected element
+
+Property groups can be opened and edited while no valid preview element is selected. In that state, a change may not be applied to the preview or serialized into CSS because there is no valid selector.
+
+**Expected behavior:** Disable or clearly gate all element-specific controls until a valid element is selected. Show a concise English empty-state instruction such as “Select an element in the preview to edit its styles.” Do not silently discard user input.
+
+#### VE-06 — Numeric input unit handling interferes with typing
+
+In `js/visual/visual-properties.js`, the numeric input path appends the configured unit on each input event. This can corrupt normal multi-character editing: typing a value such as `16` can produce malformed intermediate text such as `1px6px`.
+
+**Expected behavior:** Keep the editable input value separate from its normalized CSS value. Do not append units on every keystroke. Normalize/append the unit at a deliberate commit point (for example, change/blur/Enter), while allowing normal editing, selection, deletion, and replacement. Support negative values and decimals where the property permits them.
+
+#### VE-07 — Inline styles can override persisted Visual Editor CSS
+
+The preview applies a visual change using `element.style.setProperty`, but the underlying HTML source is not necessarily updated. The generated/persisted CSS rule may then lose to an existing inline style when the preview is rebuilt. Existing inline `!important` declarations can also defeat ordinary stylesheet rules.
+
+**Expected behavior:** Define a consistent persistence strategy. Either safely update the relevant inline declaration in the HTML model, or emit a managed CSS declaration with an explicitly designed precedence strategy. Preserve unrelated inline declarations and user-authored CSS. Do not indiscriminately add `!important` as a workaround; test cascade and specificity behavior.
+
+### 10.3 Additional functional limitations and risks to address
+
+#### VE-08 — Generated selectors are structurally fragile
+
+Selectors are generated using structural paths such as `body > div:nth-of-type(...)`, rather than preferring stable identifiers/classes when available. Inserting or removing sibling elements can cause the generated selector to point to a different element.
+
+**Improvement:** Prefer a unique existing ID where safe; otherwise use a stable class/attribute strategy or a carefully generated path. Verify uniqueness against the current document. Revalidate selectors after DOM changes and preview reloads. Avoid mutating user HTML merely to create selectors unless the behavior is explicit and reversible.
+
+#### VE-09 — HTML, BODY, and HEAD selection is restricted
+
+The current selection behavior excludes document-level elements. This limits editing common page-wide properties such as body background, default typography, and page-level layout.
+
+**Improvement:** Consider supporting BODY (and, where appropriate, HTML) with clear semantics. HEAD should generally not be treated as a visual canvas element. Test document-level style persistence carefully.
+
+#### VE-10 — Shadow DOM support is incomplete
+
+The current inspector does not provide complete traversal and selection behavior for shadow roots.
+
+**Improvement:** Decide and document whether open Shadow DOM is supported. If implemented, traverse open shadow roots deliberately and define selector/serialization behavior. Closed shadow roots cannot be inspected through ordinary page scripting and should not be promised as supported.
+
+#### VE-11 — Color controls are limited
+
+Color selection is based on fixed dropdown options; a full color picker and flexible HEX/RGB/HSL entry are not available in the reviewed implementation.
+
+**Improvement:** Add a native color input or equivalent picker plus a text field for valid CSS color syntax. Preserve alpha and modern color forms where supported. Validate with `CSS.supports` and retain unknown/current values rather than silently replacing them.
+
+#### VE-12 — Range properties are rendered as selects
+
+The `range` property type in `visual-properties.js` is handled as a select-style control rather than a true slider.
+
+**Improvement:** Implement a real range input for properties that define sensible numeric bounds and step sizes. Keep a numeric/text value field where precision is needed. Do not impose arbitrary bounds on CSS properties whose valid range is effectively open-ended.
+
+#### VE-13 — CSS values are not comprehensively validated
+
+The inspector does not consistently validate user-entered values with `CSS.supports` before applying/persisting them. Invalid values can be stored and then ignored by the browser, leaving the UI and preview inconsistent.
+
+**Improvement:** Validate property/value pairs before committing. Handle custom properties separately because their value grammar is intentionally broad. Show a clear English validation message and preserve the last valid value.
+
+#### VE-14 — Property removal semantics need definition
+
+Removing a managed value must distinguish between deleting the Visual Editor's override and deleting an existing declaration authored by the user. The current workflow needs stronger guarantees that reset/remove operations do not destroy source CSS.
+
+**Improvement:** Track managed declarations independently and define “Reset” as removing only the Visual Editor override unless the user explicitly chooses to edit source CSS. Test shorthand/longhand interactions.
+
+#### VE-15 — Custom property renaming can leave stale declarations
+
+Changing a custom property name alone may not remove or migrate the old variable declaration and references, potentially leaving an unused or conflicting variable behind.
+
+**Improvement:** Treat rename as a coordinated operation: inspect declaration and references, preview the proposed change, update references only when safe, and provide an explicit confirmation for broad changes. Never silently rewrite unrelated CSS.
+
+#### VE-16 — Current computed values and arbitrary values are not handled consistently
+
+The UI can expose a current/computed value option, but choosing arbitrary valid CSS values remains limited for some property controls.
+
+**Improvement:** Ensure every relevant control can preserve and display the current value, including values not present in its predefined option list. Provide a safe custom-value path.
+
+#### VE-17 — Responsive group is not a complete breakpoint/media-query editor
+
+The Responsive group does not provide a complete workflow for creating, editing, ordering, and removing responsive breakpoints and their media-query declarations.
+
+**Improvement:** If full responsive editing is intended, build a dedicated media-query editor with explicit breakpoint management, scoped declarations, and a clear preview viewport. Do not present a partial set of responsive-related properties as a complete breakpoint editor.
+
+#### VE-18 — States group does not fully edit pseudo-classes
+
+The States & Pseudo-classes functionality does not provide a complete authoring workflow for states such as `:hover`, `:focus`, `:active`, `:checked`, and `:disabled`.
+
+**Improvement:** Add explicit state editing with a safe preview mechanism. Do not rely on permanently forcing pseudo-state styles onto the selected element. Preserve selectors and existing rules.
+
+#### VE-19 — Generated Content lacks independent pseudo-element editing
+
+There is no complete, independent editing workflow for `::before` and `::after`, including their content and associated styles.
+
+**Improvement:** Add pseudo-element selection/editing as a distinct target type. Make it clear that pseudo-elements are not ordinary DOM nodes and serialize their declarations to the correct selectors.
+
+#### VE-20 — No complete keyframe animation editor
+
+The reviewed groups do not provide a complete animation/keyframes authoring workflow.
+
+**Improvement:** If animation editing is in scope, support named `@keyframes`, keyframe stops, per-stop declarations, animation properties, and safe editing of existing user-authored keyframes. Avoid flattening or deleting existing animation rules.
+
+#### VE-21 — Grid and Flexbox controls need deeper coverage
+
+The presence of Grid and Flexbox groups does not establish comprehensive layout editing. Advanced tracks, areas, auto-placement, gaps, alignment, wrapping, ordering, and responsive combinations require explicit coverage and testing.
+
+**Improvement:** Audit each group against the CSS specifications and provide controls for common workflows without hiding or corrupting unsupported existing values.
+
+#### VE-22 — postMessage protocol needs stronger correlation and validation
+
+The parent/preview messaging flow is relatively simple and needs request/selection correlation, stale-response handling, and robust validation of message types/payloads.
+
+**Improvement:** Define a small typed message protocol, validate incoming payloads, include request IDs and document generations, and ignore obsolete responses. Keep the iframe security boundary intact.
+
+#### VE-23 — Invalid selectors and removed elements need better recovery
+
+A selector may become invalid or stop matching after source edits or DOM mutation. Error handling should not leave the inspector in a misleading state.
+
+**Improvement:** Handle selector parsing/query errors and zero-match results explicitly. Clear invalid selection state and ask the user to select an element again. Never silently apply a rule to a different element.
+
+#### VE-24 — Managed CSS marker block needs robust preservation
+
+Visual Editor rules are stored using marker comments such as `ALFACODE-VISUAL-START`, `ALFACODE-VISUAL-RULE`, and `ALFACODE-VISUAL-END`. Marker-based storage can become fragile if users edit the CSS manually, duplicate blocks, partially delete markers, or reorder content.
+
+**Improvement:** Make parsing/rebuilding tolerant of malformed or duplicate markers. Preserve all text outside the exact managed region byte-for-byte where practical. If the managed region is ambiguous, do not rewrite it automatically; report the conflict and preserve the source.
+
+#### VE-25 — Monaco/CodeMirror synchronization requires explicit regression tests
+
+Visual CSS changes are synchronized with existing editor instances. This interaction needs tests for both Monaco and CodeMirror, including cursor/selection stability, undo/redo, unsaved edits, and simultaneous/manual CSS edits.
+
+**Improvement:** Verify that generated CSS changes enter the canonical application state exactly once, do not reset the editor unnecessarily, and do not erase user edits. Define expected undo behavior for a Visual Editor operation.
+
+#### VE-26 — Rebuilding/synchronizing CSS on every edit may be expensive
+
+If each keystroke rebuilds the managed CSS block and synchronizes editor state, large documents may experience unnecessary work or cursor disruption.
+
+**Improvement:** Separate draft input from committed updates, debounce where appropriate, avoid full-document work for every keystroke, and measure performance on large HTML/CSS documents before optimizing.
+
+### 10.4 Recommended remediation order for Visual Editor
+
+#### VE-P0 — Correctness and data safety (do first)
+
+1. Clear all selection state on Visual Mode exit.
+2. Clear/invalidate selection on preview iframe reload or document replacement.
+3. Refresh all visible computed controls when the selected element changes.
+4. Add request IDs and selection/document generation IDs to preview messaging.
+5. Disable or gate element-specific controls when no valid element is selected.
+6. Fix numeric input/unit handling so multi-character typing works.
+7. Resolve inline-style and `!important` precedence so visual changes survive preview rebuilds.
+8. Ensure no Visual Editor operation can delete or rewrite unrelated user-authored CSS.
+
+#### VE-P1 — Input quality and CSS correctness
+
+1. Add a real color picker and custom color-value input.
+2. Implement true range/slider controls where appropriate.
+3. Validate CSS property/value pairs before committing.
+4. Define safe reset/remove semantics for managed overrides.
+5. Make custom-property rename behavior safe and explicit.
+6. Preserve arbitrary/current values in controls.
+
+#### VE-P2 — Selection and DOM robustness
+
+1. Prefer stable unique selectors over brittle structural paths.
+2. Consider BODY/HTML selection with clear semantics.
+3. Handle DOM mutations and deleted/replaced selected nodes.
+4. Define and, if feasible, implement open Shadow DOM support.
+5. Improve selector and postMessage error handling.
+
+#### VE-P3 — Advanced CSS authoring
+
+1. Implement a real responsive breakpoint/media-query editor if required.
+2. Implement pseudo-class state editing.
+3. Implement separate `::before`/`::after` editing.
+4. Add keyframes/animation editing.
+5. Expand Grid/Flexbox workflows.
+6. Improve SVG and generated-content editing where supported.
+
+#### VE-P4 — Performance and regression quality
+
+1. Test large HTML/CSS documents.
+2. Avoid unnecessary full CSS rebuilds on every keystroke.
+3. Verify Monaco and CodeMirror synchronization, undo/redo, and cursor stability.
+4. Test all 33 groups and all controls.
+5. Test narrow/wide viewports and fullscreen transitions.
+6. Test offline operation and inspect browser console/network activity.
+
+### 10.5 Visual Editor acceptance checklist
+
+Do not mark the Visual Editor complete until all relevant items below pass:
+
+- [ ] Entering and exiting Visual Mode leaves no stale selection.
+- [ ] Preview reload invalidates the old selected element.
+- [ ] Selecting a different element refreshes every visible property control.
+- [ ] Delayed responses from old selections cannot overwrite current values.
+- [ ] Controls cannot silently accept edits without a valid target.
+- [ ] Numeric values, decimals, negatives, units, deletion, and replacement can be typed naturally.
+- [ ] Color values can be selected and entered without losing unsupported/current values.
+- [ ] Invalid CSS values are rejected or clearly reported before persistence.
+- [ ] Visual edits survive preview refresh and page reload.
+- [ ] Existing inline styles and `!important` declarations behave according to a documented cascade policy.
+- [ ] Resetting a visual override does not delete unrelated author CSS.
+- [ ] Generated selectors remain correct after sibling insertion/removal or are safely invalidated.
+- [ ] Malformed/duplicate Visual Editor markers do not cause unrelated CSS loss.
+- [ ] All 33 groups have been exercised; incomplete groups are clearly documented.
+- [ ] Monaco and CodeMirror both remain synchronized after visual edits.
+- [ ] Undo/redo behavior is predictable and does not lose user work.
+- [ ] No new browser console errors or failed local asset requests occur.
+- [ ] The application remains usable offline.
+
+**Important:** The VE-01 through VE-07 items are the highest-priority implementation defects identified in the reviewed source. VE-08 through VE-26 describe limitations, robustness risks, or missing capabilities; reproduce and verify each one before treating it as a confirmed runtime bug.
+
