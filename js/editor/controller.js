@@ -56,7 +56,7 @@
     css: loadString("alfa-code:css", DEFAULT_CSS),
     js: loadString("alfa-code:js", DEFAULT_JS)
   };
-  var activeEngine = load("alfa-code:editor", "monaco");
+  var activeEngine = window.AlfaCodeSettings.get("editorEngine") || load("alfa-code:editor", "monaco");
   if (!Object.prototype.hasOwnProperty.call(engineNames, activeEngine)) activeEngine = "monaco";
   var activeTab = "html";
   var instances = { monaco: {}, codemirror6: {} };
@@ -78,7 +78,8 @@
 
   function schedule() {
     if (renderTimer) clearTimeout(renderTimer);
-    renderTimer = setTimeout(render, 250);
+    if (!window.AlfaCodeSettings.get("autoRun")) return;
+    renderTimer = setTimeout(render, window.AlfaCodeSettings.get("previewDelay"));
   }
 
   function getCurrentEditor() {
@@ -168,14 +169,15 @@
     editorSwitch.title = "Switch to " + engineNames[nextEngine];
   }
 
-  function switchEditor() {
-    var nextEngine = activeEngine === "monaco" ? "codemirror6" : "monaco";
+  function switchToEngine(nextEngine, persistSetting) {
+    if (nextEngine === activeEngine) return;
     saveSelection();
     if (getCurrentEditor()) values[activeTab] = getCurrentEditor().getValue();
     syncExistingEditors();
     ensureEditor(nextEngine, activeTab).then(function () {
       activeEngine = nextEngine;
       save("alfa-code:editor", activeEngine);
+      if (persistSetting) window.AlfaCodeSettings.set("editorEngine", activeEngine);
       updateSwitchButton();
       syncEditorSurfaces();
       var editor = getCurrentEditor();
@@ -185,6 +187,11 @@
       console.error("[Alfa-Code] Could not switch editor:", error);
       showToast("Could not switch to " + engineNames[nextEngine] + ": " + error.message, true);
     });
+  }
+
+  function switchEditor() {
+    var nextEngine = activeEngine === "monaco" ? "codemirror6" : "monaco";
+    switchToEngine(nextEngine, true);
   }
 
   var splitHTML = window.AlfaCodeImport.splitHTML;
@@ -198,6 +205,14 @@
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     frame.srcdoc = buildDocument();
   }
+
+  window.AlfaCodeEditor = {
+    clearSavedCode: function () {
+      setValues({ html: "", css: "", js: "" });
+      flushPersist();
+      render();
+    }
+  };
 
   window.AlfaCodeVisualInspector.bind(frame);
 
@@ -313,6 +328,28 @@
     var editor = getCurrentEditor();
     if (editor) editor.layout();
   });
+  window.addEventListener("alfa-code:setting-change", function (event) {
+    var key = event.detail && event.detail.key;
+    if (key === "editorEngine") {
+      switchToEngine(event.detail.value, false);
+      return;
+    }
+    if (["fontSize", "tabSize", "wordWrap", "minimap"].indexOf(key) !== -1) {
+      var settings = window.AlfaCodeSettings.getAll();
+      ["monaco", "codemirror6"].forEach(function (engine) {
+        tabKeys.forEach(function (tab) {
+          var editor = instances[engine][tab];
+          if (editor && editor.setOptions) editor.setOptions(settings);
+        });
+      });
+    }
+    if (key === "autoRun" && event.detail.value) schedule();
+    if (key === "autoRun" && !event.detail.value && renderTimer) {
+      clearTimeout(renderTimer);
+      renderTimer = null;
+    }
+    if (key === "previewDelay" && window.AlfaCodeSettings.get("autoRun")) schedule();
+  });
 
   var undoButton = document.querySelector('[aria-label="Undo"]');
   var redoButton = document.querySelector('[aria-label="Redo"]');
@@ -366,6 +403,12 @@
       console.error("[Alfa-Code] Could not open preview window:", error);
       showToast("Could not open the preview window.", true);
     }
+  });
+
+  var runPreviewButton = document.getElementById("previewRun");
+  var refreshPreviewButton = document.getElementById("previewRefresh");
+  [runPreviewButton, refreshPreviewButton].forEach(function (button) {
+    if (button) button.addEventListener("click", render);
   });
 
   var clearButton = document.querySelector('[aria-label="Clear all tabs"]');

@@ -11,8 +11,12 @@
     { key: "header", buttonId: "toggleHeader", attribute: "data-header-visible" },
     { key: "footer", buttonId: "toggleFooter", attribute: "data-footer-visible" }
   ];
-  var savedViewModes = load("alfa-code:view-modes", {});
-  if (!savedViewModes || typeof savedViewModes !== "object") savedViewModes = {};
+  var appSettings = window.AlfaCodeSettings.getAll();
+  var savedViewModes = {
+    preview: appSettings.previewVisible,
+    header: appSettings.headerVisible,
+    footer: appSettings.footerVisible
+  };
   viewModes.forEach(function (mode) {
     var button = document.getElementById(mode.buttonId);
     var visible = !Object.prototype.hasOwnProperty.call(savedViewModes, mode.key) ||
@@ -31,13 +35,24 @@
         button.classList.toggle("is-active", visible);
         button.setAttribute("aria-label", (visible ? "Hide " : "Show ") + label);
         button.title = button.getAttribute("aria-label");
-        var current = load("alfa-code:view-modes", {});
-        if (!current || typeof current !== "object") current = {};
-        current[mode.key] = visible;
-        save("alfa-code:view-modes", current);
+        var settingKey = mode.key === "preview" ? "previewVisible" : mode.key + "Visible";
+        window.AlfaCodeSettings.set(settingKey, visible);
         window.dispatchEvent(new Event("alfa-code:layout-change"));
       });
     }
+    window.addEventListener("alfa-code:setting-change", function (event) {
+      var settingKey = mode.key === "preview" ? "previewVisible" : mode.key + "Visible";
+      if (event.detail.key !== settingKey) return;
+      visible = event.detail.value;
+      root.setAttribute(mode.attribute, visible ? "true" : "false");
+      if (button) {
+        button.setAttribute("aria-pressed", visible ? "true" : "false");
+        button.classList.toggle("is-active", visible);
+        button.setAttribute("aria-label", (visible ? "Hide " : "Show ") + label);
+        button.title = button.getAttribute("aria-label");
+      }
+      window.dispatchEvent(new Event("alfa-code:layout-change"));
+    });
   });
 
   function load(key, fallback) {
@@ -190,7 +205,14 @@
     return {
       open:  function () { pinned = true;  applyOpen(true);  },
       close: function () { pinned = false; applyOpen(false); },
-      isOpen: function () { return isOpen; }
+      isOpen: function () { return isOpen; },
+      reset: function () {
+        pinned = false;
+        cancelClose();
+        setWidth(opts.defaultW);
+        save(opts.storeKey, opts.defaultW);
+        applyOpen(false);
+      }
     };
   }
 
@@ -219,7 +241,7 @@
   });
 
   var SPLIT_MIN = 15, SPLIT_MAX = 85, SPLIT_DEFAULT = 50;
-  var splitVal = load("alfa-code:split", SPLIT_DEFAULT);
+  var splitVal = appSettings.split;
   function setSplit(percent) {
     var v = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, percent));
     splitVal = v;
@@ -239,6 +261,21 @@
   splitDiv.setAttribute("aria-valuemin", SPLIT_MIN);
   splitDiv.setAttribute("aria-valuemax", SPLIT_MAX);
   setSplit(splitVal);
+  window.addEventListener("alfa-code:setting-change", function (event) {
+    if (event.detail.key === "split") {
+      setSplit(event.detail.value);
+      window.dispatchEvent(new Event("alfa-code:layout-change"));
+    }
+  });
+  window.AlfaCodeLayout = {
+    reset: function () {
+      setSplit(SPLIT_DEFAULT);
+      save("alfa-code:split", SPLIT_DEFAULT);
+      leftSidebar.reset();
+      rightSidebar.reset();
+      window.dispatchEvent(new Event("alfa-code:layout-change"));
+    }
+  };
 
   var tabs   = Array.prototype.slice.call(document.querySelectorAll(".tab"));
   var panels = document.querySelectorAll(".tab-panel");

@@ -24,16 +24,17 @@
 
   function createMonacoEditor(key, surface, context) {
     return loadMonaco().then(function (monaco) {
+      var settings = window.AlfaCodeSettings.getAll();
       var editor = monaco.editor.create(surface, {
         value: context.values[key],
         language: context.languageByTab[key],
         theme: document.documentElement.getAttribute("data-color-theme") === "light" ? "vs" : "vs-dark",
         automaticLayout: true,
-        minimap: { enabled: true },
+        minimap: { enabled: settings.minimap },
         scrollBeyondLastLine: false,
-        wordWrap: "on",
-        tabSize: 2,
-        fontSize: 13,
+        wordWrap: settings.wordWrap ? "on" : "off",
+        tabSize: settings.tabSize,
+        fontSize: settings.fontSize,
         fontFamily: 'Consolas, "Courier New", monospace',
         roundedSelection: true,
         renderLineHighlight: "line",
@@ -69,6 +70,14 @@
         },
         focus: function () { editor.focus(); },
         layout: function () { editor.layout(); },
+        setOptions: function (nextSettings) {
+          editor.updateOptions({
+            fontSize: nextSettings.fontSize,
+            tabSize: nextSettings.tabSize,
+            wordWrap: nextSettings.wordWrap ? "on" : "off",
+            minimap: { enabled: nextSettings.minimap }
+          });
+        },
         undo: function () { editor.trigger("alfa-code", "undo", null); },
         redo: function () { editor.trigger("alfa-code", "redo", null); },
         find: function () {
@@ -83,18 +92,56 @@
     var CodeMirror6 = window.CodeMirror6;
     var language = key === "html" ? CodeMirror6.html :
       (key === "css" ? CodeMirror6.css : CodeMirror6.javascript);
-    var editor = new CodeMirror6.EditorView({
-      doc: context.values[key],
-      extensions: [
+    var settings = window.AlfaCodeSettings.getAll();
+    var editor;
+
+    function createView(doc, selection) {
+      var extensions = [
         CodeMirror6.basicSetup,
         language(),
-        CodeMirror6.EditorView.lineWrapping,
         CodeMirror6.EditorView.updateListener.of(function (update) {
           if (update.docChanged) context.handleChange(key, update.state.doc.toString());
+        }),
+        CodeMirror6.EditorView.domEventHandlers({
+          keydown: function (event, view) {
+            if (event.key !== "Tab" || event.shiftKey) return false;
+            event.preventDefault();
+            view.dispatch(view.state.replaceSelection(" ".repeat(settings.tabSize)));
+            return true;
+          }
+        }),
+        CodeMirror6.EditorView.theme({
+          ".cm-content": {
+            fontSize: settings.fontSize + "px",
+            tabSize: String(settings.tabSize)
+          }
         })
-      ],
-      parent: surface
-    });
+      ];
+      if (settings.wordWrap) extensions.push(CodeMirror6.EditorView.lineWrapping);
+      editor = new CodeMirror6.EditorView({
+        doc: doc,
+        extensions: extensions,
+        parent: surface
+      });
+      if (selection) editor.dispatch({ selection: selection });
+      return editor;
+    }
+
+    createView(context.values[key]);
+
+    function updateOptions(nextSettings) {
+      var state = editor.state;
+      var doc = state.doc.toString();
+      var selection = state.selection.main;
+      var selectionRange = { anchor: selection.anchor, head: selection.head };
+      var hadFocus = editor.hasFocus;
+      settings = nextSettings;
+      editor.destroy();
+      createView(doc, selectionRange);
+      editor.requestMeasure();
+      if (hadFocus) editor.focus();
+    }
+
     return {
       getValue: function () { return editor.state.doc.toString(); },
       setValue: function (value) {
@@ -116,6 +163,7 @@
       },
       focus: function () { editor.focus(); },
       layout: function () { editor.requestMeasure(); },
+      setOptions: updateOptions,
       undo: function () { CodeMirror6.undo(editor); },
       redo: function () { CodeMirror6.redo(editor); },
       find: function () { CodeMirror6.openSearchPanel(editor); }

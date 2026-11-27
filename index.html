@@ -250,10 +250,10 @@
       <section class="pane right">
         <div class="preview-header">
           <div class="preview-actions" role="toolbar" aria-label="Preview actions">
-            <button class="btn btn--preview" type="button" aria-label="Refresh" title="Refresh">
+            <button class="btn btn--preview" id="previewRefresh" type="button" aria-label="Refresh" title="Refresh">
               <svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg><span class="preview-btn-label">Refresh</span>
             </button>
-            <button class="btn btn--preview" type="button" aria-label="Run" title="Run">
+            <button class="btn btn--preview" id="previewRun" type="button" aria-label="Run" title="Run">
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span class="preview-btn-label">Run</span>
             </button>
             <button class="btn btn--preview" id="visualFullscreenToggle" type="button" aria-label="Enter visual edit fullscreen" title="Enter visual edit fullscreen" aria-pressed="false" aria-controls="sidebarRight">
@@ -288,70 +288,114 @@
       <div class="settings-layout">
         <nav class="settings-nav" aria-label="Settings categories">
           <p class="settings-nav__label">CATEGORIES</p>
-          <button class="settings-nav__item is-active" type="button" aria-current="page">
-            <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Colors</span>
+          <button class="settings-nav__item is-active" type="button" data-settings-section="colors" aria-current="page">
+            <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Appearance</span>
           </button>
-          <button class="settings-nav__item" type="button" disabled>
-            <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg><span>Editor</span><span class="settings-nav__soon">Soon</span>
+          <button class="settings-nav__item" type="button" data-settings-section="editor">
+            <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg><span>Editor</span>
           </button>
-          <button class="settings-nav__item" type="button" disabled>
-            <svg class="icon" aria-hidden="true"><use href="#i-view-preview"/></svg><span>Preview</span><span class="settings-nav__soon">Soon</span>
+          <button class="settings-nav__item" type="button" data-settings-section="preview">
+            <svg class="icon" aria-hidden="true"><use href="#i-view-preview"/></svg><span>Preview</span>
           </button>
-          <button class="settings-nav__item" type="button" disabled>
-            <svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg><span>Shortcuts</span><span class="settings-nav__soon">Soon</span>
+          <button class="settings-nav__item" type="button" data-settings-section="layout">
+            <svg class="icon" aria-hidden="true"><use href="#i-layout-dashboard"/></svg><span>Layout</span>
+          </button>
+          <button class="settings-nav__item" type="button" data-settings-section="shortcuts">
+            <svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg><span>Shortcuts</span>
+          </button>
+          <button class="settings-nav__item" type="button" data-settings-section="data">
+            <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Data</span>
           </button>
         </nav>
         <div class="settings-content">
-          <section class="settings-card" aria-labelledby="themeSettingsColorsTitle">
-            <div class="settings-card__heading">
-              <div>
-                <h2 id="themeSettingsColorsTitle">Interface colors</h2>
-                <p>Choose a preset palette or set your own accent color.</p>
+          <section class="settings-section is-active" data-settings-panel="colors" aria-labelledby="themeSettingsColorsTitle">
+            <div class="settings-card">
+              <div class="settings-card__heading">
+                <div><h2 id="themeSettingsColorsTitle">Interface colors</h2><p>Choose a preset palette or set your own accent color.</p></div>
+                <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>
               </div>
-              <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>
-            </div>
-            <h3 class="settings-section-title">Preset palettes</h3>
-            <div class="theme-options" id="themeOptions" role="radiogroup" aria-label="Interface color presets">
-              <button class="theme-option" type="button" role="radio" aria-checked="true" data-theme-option="ocean" style="--theme-swatch:#45d8e8;--theme-surface:#0a2830;--theme-base:#04141a">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Ocean</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="forest" style="--theme-swatch:#4ade80;--theme-surface:#122a20;--theme-base:#07130f">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Forest</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="violet" style="--theme-swatch:#c4a1ff;--theme-surface:#251d35;--theme-base:#100c19">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Violet</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="amber" style="--theme-swatch:#ffc266;--theme-surface:#332516;--theme-base:#171007">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Amber</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="rose" style="--theme-swatch:#ff8da1;--theme-surface:#331c25;--theme-base:#170b10">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Rose</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="light" style="--theme-swatch:#2878c8;--theme-surface:#f6f8fb;--theme-base:#e1e8f0">
-                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-option__name">Light</span><span class="theme-option__check" aria-hidden="true">✓</span>
-              </button>
-            </div>
-            <h3 class="settings-section-title settings-section-title--custom">Custom accent</h3>
-            <div class="custom-color-control">
-              <div class="custom-color-control__copy">
-                <strong>Choose your interface color</strong>
-                <span>Updates accents, highlights, and editor selection colors.</span>
+              <h3 class="settings-section-title">Preset palettes</h3>
+              <div class="theme-options" id="themeOptions" role="radiogroup" aria-label="Interface color presets">
+                <button class="theme-option" type="button" role="radio" aria-checked="true" data-theme-option="ocean" style="--theme-swatch:#45d8e8;--theme-surface:#0a2830;--theme-base:#04141a"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Ocean</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
+                <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="forest" style="--theme-swatch:#4ade80;--theme-surface:#122a20;--theme-base:#07130f"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Forest</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
+                <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="violet" style="--theme-swatch:#c4a1ff;--theme-surface:#251d35;--theme-base:#100c19"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Violet</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
+                <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="amber" style="--theme-swatch:#ffc266;--theme-surface:#332516;--theme-base:#171007"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Amber</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
+                <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="rose" style="--theme-swatch:#ff8da1;--theme-surface:#331c25;--theme-base:#170b10"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Rose</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
+                <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="light" style="--theme-swatch:#2878c8;--theme-surface:#f6f8fb;--theme-base:#e1e8f0"><span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-option__name">Light</span><span class="theme-option__check" aria-hidden="true">✓</span></button>
               </div>
-              <label class="custom-color-picker">
-                <span class="visually-hidden">Custom interface accent color</span>
-                <input id="customThemeColor" type="color" value="#45d8e8" aria-label="Custom interface accent color">
-              </label>
-              <output class="custom-color-value" id="customThemeColorValue" for="customThemeColor">#45D8E8</output>
-              <button class="custom-color-reset" id="customThemeColorReset" type="button">Reset to palette</button>
+              <h3 class="settings-section-title settings-section-title--custom">Custom accent</h3>
+              <div class="custom-color-control">
+                <div class="custom-color-control__copy"><strong>Choose your interface color</strong><span>Updates accents, highlights, and editor selection colors.</span></div>
+                <label class="custom-color-picker"><span class="visually-hidden">Custom interface accent color</span><input id="customThemeColor" type="color" value="#45d8e8" aria-label="Custom interface accent color"></label>
+                <output class="custom-color-value" id="customThemeColorValue" for="customThemeColor">#45D8E8</output>
+                <button class="custom-color-reset" id="customThemeColorReset" type="button">Reset to palette</button>
+              </div>
+            </div>
+            <p class="settings-note">Your color preferences are saved in this browser and do not affect the project preview.</p>
+          </section>
+
+          <section class="settings-section" data-settings-panel="editor" aria-labelledby="editorSettingsTitle" hidden>
+            <div class="settings-card">
+              <div class="settings-card__heading"><div><h2 id="editorSettingsTitle">Editor</h2><p>Choose how code is displayed and edited.</p></div><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg></div>
+              <div class="settings-control-list">
+                <label class="settings-control"><span><strong>Default editor</strong><small>Choose the editor used when AlfaCode opens.</small></span><select data-setting="editorEngine" aria-label="Default editor"><option value="monaco">Monaco</option><option value="codemirror6">CodeMirror 6</option></select></label>
+                <label class="settings-control"><span><strong>Font size</strong><small>Editor text size, in pixels.</small></span><span class="settings-inline-control"><input data-setting="fontSize" type="range" min="11" max="22" step="1"><output data-setting-output="fontSize"></output></span></label>
+                <label class="settings-control"><span><strong>Indent size</strong><small>Number of spaces inserted for a tab.</small></span><select data-setting="tabSize" aria-label="Indent size"><option value="2">2 spaces</option><option value="4">4 spaces</option></select></label>
+                <label class="settings-control"><span><strong>Word wrap</strong><small>Wrap long lines to fit the editor width.</small></span><input class="settings-switch" data-setting="wordWrap" type="checkbox" role="switch" aria-label="Word wrap"></label>
+                <label class="settings-control"><span><strong>Minimap</strong><small>Show a code overview beside the editor (Monaco).</small></span><input class="settings-switch" data-setting="minimap" type="checkbox" role="switch" aria-label="Minimap"></label>
+              </div>
             </div>
           </section>
-          <p class="settings-note">Your color preferences are saved in this browser and do not affect the project preview.</p>
+
+          <section class="settings-section" data-settings-panel="preview" aria-labelledby="previewSettingsTitle" hidden>
+            <div class="settings-card">
+              <div class="settings-card__heading"><div><h2 id="previewSettingsTitle">Preview</h2><p>Control when your code is rendered and refreshed.</p></div><svg class="icon" aria-hidden="true"><use href="#i-view-preview"/></svg></div>
+              <div class="settings-control-list">
+                <label class="settings-control"><span><strong>Run automatically</strong><small>Refresh the preview after code changes.</small></span><input class="settings-switch" data-setting="autoRun" type="checkbox" role="switch" aria-label="Run preview automatically"></label>
+                <label class="settings-control" data-setting-dependent="autoRun"><span><strong>Update delay</strong><small>Wait before refreshing after typing.</small></span><span class="settings-inline-control"><input data-setting="previewDelay" type="range" min="100" max="1000" step="50"><output data-setting-output="previewDelay"></output></span></label>
+                <div class="settings-control"><span><strong>Preview window</strong><small>Open a separate live preview window from the preview toolbar.</small></span><span class="settings-control__hint">Available in toolbar</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" data-settings-panel="layout" aria-labelledby="layoutSettingsTitle" hidden>
+            <div class="settings-card">
+              <div class="settings-card__heading"><div><h2 id="layoutSettingsTitle">Layout</h2><p>Adjust the workspace and visible interface areas.</p></div><svg class="icon" aria-hidden="true"><use href="#i-layout-dashboard"/></svg></div>
+              <div class="settings-control-list">
+                <label class="settings-control"><span><strong>Editor / preview split</strong><small>Set the editor width as a percentage.</small></span><span class="settings-inline-control"><input data-setting="split" type="range" min="20" max="80" step="1"><output data-setting-output="split"></output></span></label>
+                <label class="settings-control"><span><strong>Show preview</strong><small>Display the preview pane beside the editor.</small></span><input class="settings-switch" data-setting="previewVisible" type="checkbox" role="switch" aria-label="Show preview"></label>
+                <label class="settings-control"><span><strong>Show app header</strong><small>Keep the top action bar visible.</small></span><input class="settings-switch" data-setting="headerVisible" type="checkbox" role="switch" aria-label="Show app header"></label>
+                <label class="settings-control"><span><strong>Show app footer</strong><small>Keep the bottom bar visible.</small></span><input class="settings-switch" data-setting="footerVisible" type="checkbox" role="switch" aria-label="Show app footer"></label>
+                <label class="settings-control"><span><strong>Reduce motion</strong><small>Minimize interface animations.</small></span><input class="settings-switch" data-setting="reduceMotion" type="checkbox" role="switch" aria-label="Reduce motion"></label>
+                <div class="settings-control"><span><strong>Restore default layout</strong><small>Reset pane sizes and visibility options.</small></span><button class="settings-button" id="resetLayoutSettings" type="button">Restore layout</button></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" data-settings-panel="shortcuts" aria-labelledby="shortcutsSettingsTitle" hidden>
+            <div class="settings-card">
+              <div class="settings-card__heading"><div><h2 id="shortcutsSettingsTitle">Keyboard shortcuts</h2><p>Quick ways to navigate and edit.</p></div><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg></div>
+              <div class="shortcut-list">
+                <div class="shortcut-row"><span>Undo / Redo</span><span><kbd>Ctrl</kbd> <kbd>Z</kbd> / <kbd>Ctrl</kbd> <kbd>Y</kbd></span></div>
+                <div class="shortcut-row"><span>Find in editor</span><span><kbd>Ctrl</kbd> <kbd>F</kbd></span></div>
+                <div class="shortcut-row"><span>Switch code tab</span><span><kbd>←</kbd> <kbd>→</kbd> in tab bar</span></div>
+                <div class="shortcut-row"><span>Close settings / visual mode</span><span><kbd>Esc</kbd></span></div>
+                <div class="shortcut-row"><span>Resize panels</span><span><kbd>←</kbd> <kbd>→</kbd> on divider</span></div>
+              </div>
+              <p class="settings-note">Editor shortcuts follow the selected editor. On macOS, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</p>
+            </div>
+          </section>
+
+          <section class="settings-section" data-settings-panel="data" aria-labelledby="dataSettingsTitle" hidden>
+            <div class="settings-card">
+              <div class="settings-card__heading"><div><h2 id="dataSettingsTitle">Data &amp; privacy</h2><p>Your work stays in this browser; no account or internet connection is required.</p></div><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg></div>
+              <div class="settings-control-list">
+                <div class="settings-control"><span><strong>Export preferences</strong><small>Download your interface and editor preferences as JSON.</small></span><button class="settings-button" id="exportSettings" type="button">Export</button></div>
+                <div class="settings-control"><span><strong>Reset preferences</strong><small>Restore appearance, editor, preview and layout settings. Code is kept.</small></span><button class="settings-button" id="resetPreferences" type="button">Reset preferences</button></div>
+                <div class="settings-control settings-control--danger"><span><strong>Clear saved code</strong><small>Remove saved HTML, CSS and JavaScript from this browser.</small></span><button class="settings-button settings-button--danger" id="clearSavedCode" type="button">Clear code</button></div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </section>
@@ -378,6 +422,7 @@
   <script src="js/editor/defaults.js"></script>
   <script src="js/editor/html-import.js"></script>
   <script src="js/editor/preview-document.js"></script>
+  <script src="js/ui/settings-state.js"></script>
   <script src="js/editor/engines.js"></script>
   <script src="js/editor/visual-inspector.js"></script>
   <script src="js/ui/layout.js"></script>
