@@ -2,6 +2,8 @@
   "use strict";
 
   var registry = {};
+  var selectedSelector = null;
+  var customPropertyAssignments = {};
 
   function register(id, definition) {
     registry[id] = definition;
@@ -138,6 +140,89 @@
     return "initial";
   }
 
+  function toHexColor(value) {
+    var canvas = document.createElement("canvas");
+    var context = canvas.getContext("2d");
+    if (!context) return "#000000";
+    context.fillStyle = "#000000";
+    context.fillStyle = value;
+    var normalized = context.fillStyle;
+    if (/^#[0-9a-f]{6}$/i.test(normalized)) return normalized;
+    var match = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/i.exec(normalized);
+    if (!match) return "#000000";
+    return "#" + match.slice(1, 4).map(function (channel) {
+      return Number(channel).toString(16).padStart(2, "0");
+    }).join("");
+  }
+
+  function appendDatalist(parent, input, options) {
+    var list = document.createElement("datalist");
+    list.id = "visual-options-" + Math.random().toString(36).slice(2);
+    options.forEach(function (option) {
+      var choice = document.createElement("option");
+      choice.value = option.value;
+      choice.label = option.label;
+      list.appendChild(choice);
+    });
+    parent.appendChild(list);
+    input.setAttribute("list", list.id);
+  }
+
+  function normalizedValue(input, item) {
+    var value = input.value.trim();
+    var unit = item.unit || defaultUnit(item.property);
+    if (unit && value && /^-?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
+      value += unit;
+      input.value = value;
+    }
+    return value;
+  }
+
+  function reportControlError(row, input, message) {
+    var status = row.querySelector(".visual-property-control__status");
+    if (status) status.textContent = message || "";
+    if (input) input.setAttribute("aria-invalid", message ? "true" : "false");
+  }
+
+  function commitControl(row, input, item) {
+    var property = item.property;
+    var value = normalizedValue(input, item);
+    if (property === "--alfa-custom-property-name") return true;
+    if (property === "--alfa-custom-property-value") {
+      var previousProperty = selectedSelector ? customPropertyAssignments[selectedSelector] : null;
+      var nameInput = row.parentElement.querySelector('[data-property="--alfa-custom-property-name"]');
+      property = !value && previousProperty ? previousProperty : (nameInput ? nameInput.value.trim() : "");
+      if (!/^--(?!alfa-)[a-z0-9_-]+$/i.test(property)) {
+        reportControlError(row, input, "Enter a valid CSS variable name.");
+        return false;
+      }
+    }
+    var inlineImportant = input.dataset.inlineImportant === "true";
+    var inlinePresent = input.dataset.inlinePresent === "true";
+    var result = window.AlfaCodeEditor && window.AlfaCodeEditor.setVisualProperty
+      ? window.AlfaCodeEditor.setVisualProperty(property, value, {
+        important: inlinePresent && !inlineImportant,
+        inlineImportant: inlineImportant
+      })
+      : false;
+    if (result !== false && item.property === "--alfa-custom-property-value") {
+      var oldProperty = selectedSelector ? customPropertyAssignments[selectedSelector] : null;
+      if (value && oldProperty && oldProperty !== property) {
+        result = window.AlfaCodeEditor.setVisualProperty(oldProperty, "", {});
+        if (result === false) {
+          reportControlError(row, input, "New variable was set, but the previous override could not be removed.");
+          return false;
+        }
+      }
+      if (selectedSelector) {
+        if (value) customPropertyAssignments[selectedSelector] = property;
+        else delete customPropertyAssignments[selectedSelector];
+      }
+    }
+    reportControlError(row, input, result === false ? "Invalid value. Previous style was kept." : "");
+    return result !== false;
+  }
+
   function bind(detail, title, groups, frame) {
     var titleNode = detail.querySelector("[data-visual-detail-title]");
     var controls = detail.querySelector("[data-visual-detail-controls]");
@@ -155,8 +240,10 @@
       block.appendChild(heading);
 
       group.fields.forEach(function (item) {
-        var row = document.createElement("label");
+        var row = document.createElement("div");
         row.className = "visual-property-control";
+        row.setAttribute("role", "group");
+        row.setAttribute("aria-label", item.label);
         var copy = document.createElement("span");
         copy.className = "visual-property-control__copy";
         var name = document.createElement("strong");
@@ -171,7 +258,9 @@
 
         var input;
         var options = valuesFor(item);
-        if (item.kind === "select" || item.kind === "color" || item.kind === "range" || item.kind === "checkbox") {
+        var valueControl = document.createElement("span");
+        valueControl.className = "visual-property-control__value";
+        if (item.kind === "select" || item.kind === "checkbox") {
           input = document.createElement("select");
           options.forEach(function (option) {
             var choice = document.createElement("option");
@@ -180,78 +269,191 @@
             input.appendChild(choice);
           });
           input.value = defaultValue(item, options);
+          valueControl.appendChild(input);
+        } else if (item.kind === "color") {
+          var colorPicker = document.createElement("input");
+          colorPicker.type = "color";
+          colorPicker.className = "visual-property-control__color";
+          colorPicker.value = toHexColor(defaultValue(item, options));
+          input = document.createElement("input");
+          input.type = "text";
+          input.value = defaultValue(item, options);
+          appendDatalist(controls, input, options);
+          input.placeholder = "Enter any valid CSS color";
+          input.addEventListener("change", function () {
+            if (commitControl(row, input, item)) colorPicker.value = toHexColor(input.value);
+          });
+          input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              input.blur();
+            }
+          });
+          colorPicker.addEventListener("input", function () {
+            input.value = colorPicker.value;
+            commitControl(row, input, item);
+          });
+          valueControl.appendChild(colorPicker);
+          valueControl.appendChild(input);
+        } else if (item.kind === "range") {
+          var range = document.createElement("input");
+          range.type = "range";
+          range.min = String(item.min == null ? 0 : item.min);
+          range.max = String(item.max == null ? 100 : item.max);
+          range.step = String(item.step == null ? 1 : item.step);
+          range.dataset.property = item.property;
+          range.dataset.defaultValue = defaultValue(item, options);
+          range.setAttribute("aria-label", item.label);
+          range.addEventListener("input", function () {
+            input.value = range.value;
+            commitControl(row, input, item);
+          });
+          input = document.createElement("input");
+          input.type = "text";
+          input.value = defaultValue(item, options);
+          appendDatalist(controls, input, options);
+          input.placeholder = "Enter a number";
+          input.addEventListener("change", function () {
+            var value = Number(input.value);
+            if (!Number.isFinite(value) || value < Number(range.min) || value > Number(range.max)) {
+              reportControlError(row, input, "Enter a value from " + range.min + " to " + range.max + ".");
+              return;
+            }
+            range.value = String(value);
+            commitControl(row, input, item);
+          });
+          valueControl.appendChild(range);
+          valueControl.appendChild(input);
         } else {
           input = document.createElement("input");
           input.type = "text";
           input.value = defaultValue(item, options);
-          var listId = "visual-options-" + Math.random().toString(36).slice(2);
-          var list = document.createElement("datalist");
-          list.id = listId;
-          options.forEach(function (option) {
-            var choice = document.createElement("option");
-            choice.value = option.value;
-            choice.label = option.label;
-            list.appendChild(choice);
-          });
-          controls.appendChild(list);
-          input.setAttribute("list", listId);
+          appendDatalist(controls, input, options);
           input.placeholder = item.placeholder || "Choose or enter a value";
+          valueControl.appendChild(input);
         }
 
         input.className = (input.className ? input.className + " " : "") + "visual-property-control__input";
         input.dataset.property = item.property;
-        input.dataset.kind = input.tagName === "SELECT" ? "select" : "text";
+        input.dataset.kind = input.tagName === "SELECT" ? "select" : item.kind;
+        input.dataset.defaultValue = defaultValue(item, options);
+        input.setAttribute("aria-label", item.label);
         var unit = item.unit || defaultUnit(item.property);
         if (unit) input.dataset.unit = unit;
-        row.appendChild(input);
-        block.appendChild(row);
-
-        input.addEventListener("input", function () {
-          var value = input.value.trim();
-          var property = item.property;
-          if (input.dataset.unit && value && input.dataset.kind !== "select" && /^-?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
-            value += input.dataset.unit;
-            input.value = value;
-          }
-          if (property === "--alfa-custom-property-name") return;
-          if (property === "--alfa-custom-property-value") {
-            var nameInput = controls.querySelector('[data-property="--alfa-custom-property-name"]');
-            var customProperty = nameInput ? nameInput.value.trim() : "";
-            if (!/^--(?!alfa-)[a-z0-9_-]+$/i.test(customProperty)) return;
-            property = customProperty;
-          }
-          if (window.AlfaCodeEditor && window.AlfaCodeEditor.setVisualProperty) {
-            window.AlfaCodeEditor.setVisualProperty(property, value);
+        if (item.kind === "select") {
+          input.addEventListener("change", function () { commitControl(row, input, item); });
+        } else if (item.kind !== "color" && item.kind !== "range") {
+          input.addEventListener("change", function () { commitControl(row, input, item); });
+          input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              input.blur();
+            }
+          });
+        }
+        row.appendChild(valueControl);
+        var reset = document.createElement("button");
+        reset.type = "button";
+        reset.className = "visual-property-control__reset";
+        reset.textContent = "Reset";
+        reset.setAttribute("aria-label", "Reset " + item.label);
+        reset.addEventListener("click", function () {
+          input.value = "";
+          if (commitControl(row, input, item)) {
+            input.value = input.dataset.defaultValue;
+            var picker = row.querySelector('input[type="color"]');
+            if (picker) picker.value = toHexColor(input.value);
+            var range = row.querySelector('input[type="range"]');
+            if (range) range.value = range.dataset.defaultValue;
           }
         });
+        valueControl.appendChild(reset);
+        var status = document.createElement("small");
+        status.className = "visual-property-control__status";
+        status.setAttribute("role", "status");
+        row.appendChild(status);
+        block.appendChild(row);
       });
 
       controls.appendChild(block);
     });
 
-    var properties = [];
-    definition.sections.forEach(function (group) {
-      group.fields.forEach(function (item) { if (item.property) properties.push(item.property); });
+    setEnabled(detail, false);
+  }
+
+  function setEnabled(detail, enabled) {
+    detail.querySelectorAll("input, select, button.visual-property-control__reset").forEach(function (control) {
+      control.disabled = !enabled;
     });
-    if (frame && frame.contentWindow) {
-      frame.contentWindow.postMessage({ type: "alfa-visual-computed-request", properties: properties }, "*");
+    var controls = detail.querySelector("[data-visual-detail-controls]");
+    if (!controls) return;
+    var hint = controls.querySelector(".visual-property-controls__empty");
+    if (!enabled && !hint) {
+      hint = document.createElement("p");
+      hint.className = "visual-property-controls__empty";
+      hint.textContent = "Select an element in the preview to edit its styles.";
+      controls.insertBefore(hint, controls.firstChild);
+    } else if (enabled && hint) {
+      hint.remove();
     }
   }
 
-  function setComputedValues(detail, values) {
+  function resetValues(detail) {
+    detail.querySelectorAll("[data-property]").forEach(function (input) {
+      if (input.type === "range") {
+        input.value = input.dataset.defaultValue || input.min;
+        return;
+      }
+      input.value = input.dataset.defaultValue || "";
+      input.dataset.inlinePresent = "false";
+      input.dataset.inlineImportant = "false";
+      if (input.dataset.kind === "color") {
+        var picker = input.closest(".visual-property-control").querySelector('input[type="color"]');
+        if (picker) picker.value = toHexColor(input.value);
+      }
+      if (input.tagName === "SELECT") {
+        input.querySelectorAll("[data-computed-option]").forEach(function (option) { option.remove(); });
+      }
+    });
+    detail.querySelectorAll(".visual-property-control__status").forEach(function (status) {
+      status.textContent = "";
+    });
+  }
+
+  function setComputedValues(detail, values, inlineStyles) {
     if (!values || typeof values !== "object") return;
     detail.querySelectorAll("[data-property]").forEach(function (input) {
+      if (input.type === "range" || input.classList.contains("visual-property-control__color")) return;
       var property = input.dataset.property;
       if (!Object.prototype.hasOwnProperty.call(values, property)) return;
       var value = String(values[property]);
       if (!value) return;
-      if (input.tagName === "SELECT" && !Array.prototype.some.call(input.options, function (option) { return option.value === value; })) {
-        var current = document.createElement("option");
-        current.value = value;
-        current.textContent = "Current: " + value;
-        input.appendChild(current);
+      var style = inlineStyles && inlineStyles[property];
+      input.dataset.inlinePresent = style && style.present ? "true" : "false";
+      input.dataset.inlineImportant = style && style.important ? "true" : "false";
+      if (input.tagName === "SELECT") {
+        var known = Array.prototype.some.call(input.options, function (option) {
+          return !option.hasAttribute("data-computed-option") && option.value === value;
+        });
+        input.querySelectorAll("[data-computed-option]").forEach(function (option) { option.remove(); });
+        if (!known) {
+          var current = document.createElement("option");
+          current.value = value;
+          current.textContent = "Current: " + value;
+          current.setAttribute("data-computed-option", "");
+          input.appendChild(current);
+        }
       }
       input.value = value;
+      var row = input.closest(".visual-property-control");
+      if (row && input.dataset.kind === "range") {
+        var range = row.querySelector('input[type="range"]');
+        var number = parseFloat(value);
+        if (range && Number.isFinite(number)) range.value = String(Math.max(Number(range.min), Math.min(Number(range.max), number)));
+      } else if (row && input.dataset.kind === "color") {
+        var picker = row.querySelector('input[type="color"]');
+        if (picker) picker.value = toHexColor(value);
+      }
     });
   }
 
@@ -278,6 +480,16 @@
     field: field,
     section: section,
     bind: bind,
+    setSelection: function (selector) {
+      selectedSelector = typeof selector === "string" ? selector : null;
+      if (selectedSelector && !customPropertyAssignments[selectedSelector] &&
+          window.AlfaCodeEditor && window.AlfaCodeEditor.getVisualCustomProperties) {
+        var existing = window.AlfaCodeEditor.getVisualCustomProperties(selectedSelector);
+        if (existing.length === 1) customPropertyAssignments[selectedSelector] = existing[0];
+      }
+    },
+    setEnabled: setEnabled,
+    resetValues: resetValues,
     setComputedValues: setComputedValues,
     getPropertyList: function (id) {
       var definition = registry[id];
