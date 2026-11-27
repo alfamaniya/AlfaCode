@@ -96,14 +96,6 @@
     return Object.assign({}, settings);
   }
 
-  function reset() {
-    settings = Object.assign({}, defaults);
-    persist();
-    window.dispatchEvent(new CustomEvent("alfa-code:settings-reset", {
-      detail: { settings: getAll() }
-    }));
-  }
-
   function showToast(message, isError) {
     var container = document.getElementById("toastContainer");
     if (!container) return;
@@ -146,6 +138,7 @@
   function resetPreferences() {
     if (!window.confirm("Reset interface preferences? Your code will be kept.")) return;
     [
+      storageKey,
       "alfa-code:editor",
       "alfa-code:split",
       "alfa-code:view-modes",
@@ -160,16 +153,19 @@
         console.warn("[Alfa-Code] Could not clear preference " + key + ":", error);
       }
     });
-    settings = Object.assign({}, defaults);
-    persist();
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(defaults));
+    } catch (error) {
+      console.warn("[Alfa-Code] Could not restore default settings:", error);
+    }
     window.location.reload();
   }
 
   function clearSavedCode() {
     if (!window.confirm("Clear saved HTML, CSS and JavaScript? This cannot be undone.")) return;
     if (!window.AlfaCodeEditor || !window.AlfaCodeEditor.clearSavedCode) {
-      showToast("Could not clear the saved code.", true);
-      console.error("[Alfa-Code] Editor controller is not available to clear saved code.");
+      console.error("[Alfa-Code] Cannot clear code before the editor is initialized.");
+      showToast("The editor is not ready yet. Try again in a moment.", true);
       return;
     }
     window.AlfaCodeEditor.clearSavedCode();
@@ -226,8 +222,7 @@
   window.AlfaCodeSettings = {
     get: function (key) { return settings[key]; },
     getAll: getAll,
-    set: set,
-    reset: reset
+    set: set
   };
 
   persist();

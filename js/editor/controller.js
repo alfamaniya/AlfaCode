@@ -149,6 +149,14 @@
     schedule();
   }
 
+  window.AlfaCodeEditor = {
+    clearSavedCode: function () {
+      setValues({ html: "", css: "", js: "" });
+      render();
+      flushPersist();
+    }
+  };
+
   function activateTab(key) {
     if (tabKeys.indexOf(key) === -1) return;
     saveSelection();
@@ -205,14 +213,6 @@
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     frame.srcdoc = buildDocument();
   }
-
-  window.AlfaCodeEditor = {
-    clearSavedCode: function () {
-      setValues({ html: "", css: "", js: "" });
-      flushPersist();
-      render();
-    }
-  };
 
   window.AlfaCodeVisualInspector.bind(frame);
 

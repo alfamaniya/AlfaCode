@@ -35,6 +35,10 @@
         button.classList.toggle("is-active", visible);
         button.setAttribute("aria-label", (visible ? "Hide " : "Show ") + label);
         button.title = button.getAttribute("aria-label");
+        var current = load("alfa-code:view-modes", {});
+        if (!current || typeof current !== "object") current = {};
+        current[mode.key] = visible;
+        save("alfa-code:view-modes", current);
         var settingKey = mode.key === "preview" ? "previewVisible" : mode.key + "Visible";
         window.AlfaCodeSettings.set(settingKey, visible);
         window.dispatchEvent(new Event("alfa-code:layout-change"));
@@ -256,7 +260,10 @@
     min: SPLIT_MIN,
     max: SPLIT_MAX,
     step: 2,
-    onEnd: function () { save("alfa-code:split", splitVal); }
+    onEnd: function () {
+      save("alfa-code:split", splitVal);
+      window.AlfaCodeSettings.set("split", splitVal);
+    }
   });
   splitDiv.setAttribute("aria-valuemin", SPLIT_MIN);
   splitDiv.setAttribute("aria-valuemax", SPLIT_MAX);

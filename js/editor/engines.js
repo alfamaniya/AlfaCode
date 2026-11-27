@@ -99,6 +99,7 @@
       var extensions = [
         CodeMirror6.basicSetup,
         language(),
+        CodeMirror6.EditorView.lineWrapping,
         CodeMirror6.EditorView.updateListener.of(function (update) {
           if (update.docChanged) context.handleChange(key, update.state.doc.toString());
         }),
@@ -117,29 +118,31 @@
           }
         })
       ];
-      if (settings.wordWrap) extensions.push(CodeMirror6.EditorView.lineWrapping);
       editor = new CodeMirror6.EditorView({
         doc: doc,
         extensions: extensions,
         parent: surface
       });
+      applyOptions();
       if (selection) editor.dispatch({ selection: selection });
       return editor;
     }
 
     createView(context.values[key]);
 
+    function applyOptions() {
+      var content = editor.contentDOM;
+      content.style.fontSize = settings.fontSize + "px";
+      content.style.tabSize = String(settings.tabSize);
+      content.style.whiteSpace = settings.wordWrap ? "break-spaces" : "pre";
+      content.style.overflowWrap = settings.wordWrap ? "anywhere" : "normal";
+      surface.setAttribute("data-word-wrap", settings.wordWrap ? "true" : "false");
+    }
+
     function updateOptions(nextSettings) {
-      var state = editor.state;
-      var doc = state.doc.toString();
-      var selection = state.selection.main;
-      var selectionRange = { anchor: selection.anchor, head: selection.head };
-      var hadFocus = editor.hasFocus;
       settings = nextSettings;
-      editor.destroy();
-      createView(doc, selectionRange);
+      applyOptions();
       editor.requestMeasure();
-      if (hadFocus) editor.focus();
     }
 
     return {
