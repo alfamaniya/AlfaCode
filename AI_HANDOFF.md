@@ -701,3 +701,157 @@ Do not mark the Visual Editor complete until all relevant items below pass:
 
 **Important:** The VE-01 through VE-07 items are the highest-priority implementation defects identified in the reviewed source. VE-08 through VE-26 describe limitations, robustness risks, or missing capabilities; reproduce and verify each one before treating it as a confirmed runtime bug.
 
+
+
+## 11. Follow-up review: Visual Editor changes in commit `c4baf602c63a07b7badc9847a97ea6f6e00d47f5`
+
+**Review date:** 2026-11-27  
+**Compared range:** `8e174c1cc42a50290ae1941cf429ebf13b1ea72e` → `c4baf602c63a07b7badc9847a97ea6f6e00d47f5`  
+**Result:** `main` was ahead by one commit. The new commit changed six files: `css/shell.css`, `js/editor/controller.js`, `js/editor/preview-document.js`, `js/editor/visual-inspector.js`, `js/visual/visual-properties.js`, and `visual mode.md`.
+
+This is a source review of the new commit and its current file contents. It is not evidence of successful browser/runtime testing. The status labels below mean “implemented in the inspected source”, not “verified working in a browser”.
+
+### 11.1 What changed
+
+#### A. Selection lifecycle and stale-response protection
+
+Files: `js/editor/visual-inspector.js`, `js/editor/controller.js`, `js/editor/preview-document.js`
+
+- Added parent-side `documentGeneration`, `selectionGeneration`, and `latestComputedRequest` tracking.
+- Computed-style requests now include request ID, document generation, and selection generation.
+- The preview returns those identifiers with computed values; the parent accepts a response only when all identifiers match the current state.
+- The parent now centralizes selection cleanup: it clears the label/selector, invalidates pending requests, clears controller/property selection state, disables controls, and resets visible control values.
+- Selection state is cleared when Visual Mode exits and when the preview iframe loads/reloads.
+- Selecting another element resets the currently displayed control values, enables controls for the new target, and requests fresh computed styles.
+- The preview clears its selected element when it receives a clear-selection message or Visual Mode is disabled.
+- The preview checks that a selected node is still connected and that its current generated selector still matches before servicing computed-style/property requests. It reports an invalid selection instead of continuing with a stale target.
+- Parent and preview message handlers now check `event.source` against the expected frame/parent window.
+
+#### B. Selector generation and document-level targets
+
+File: `js/editor/preview-document.js`
+
+- The selector generator now returns `html` and `body` for the document root/body.
+- It prefers a unique, syntactically restricted element ID (for example, `#main`) before falling back to a structural `:nth-of-type(...)` path.
+- The preview click handler no longer excludes HTML and BODY, so these targets can be selected. HEAD, SCRIPT, STYLE, and the inspector's own hover label remain excluded.
+
+**Remaining limitation:** Stable existing IDs are preferred, but existing classes/attributes are not used as a stable selector strategy. Elements without a suitable unique ID still rely on structural paths and can be retargeted if the DOM structure changes. Open/closed Shadow DOM traversal is not implemented by these changes.
+
+#### C. Property controls and input behavior
+
+Files: `js/visual/visual-properties.js`, `css/shell.css`
+
+- Controls are disabled when a group is first bound and until an element is selected; an English empty-state hint is shown.
+- Added native color inputs alongside text fields that accept CSS color values.
+- Added actual `input[type=range]` controls for fields configured as range properties, with a numeric text field alongside.
+- Numeric unit normalization now occurs in `normalizedValue()` at commit time rather than appending units on every keystroke.
+- Property updates are committed on change (and Enter triggers blur for text controls), rather than applying every text keystroke as a CSS update.
+- Added per-control Reset buttons. Reset submits an empty value to remove that Visual Editor override, then restores the control's displayed default.
+- Added inline status/error text and `aria-invalid` feedback for invalid input.
+- Computed values not present in a select's predefined options are added as a temporary `Current:` option.
+- Computed inline declaration presence and `!important` priority are now passed to the property commit logic.
+- Updated control layout and disabled-state styling in `css/shell.css`.
+
+#### D. CSS validation, cascade handling, and managed-block safety
+
+File: `js/editor/controller.js`
+
+- `setVisualProperty()` now returns a success/failure boolean and rejects missing selections, malformed values containing declaration delimiters/braces/newlines, invalid property names, and unsupported non-custom-property values according to `CSS.supports()`.
+- Custom properties are validated separately from ordinary CSS properties.
+- If the selected element has a normal inline declaration for a property, the generated managed override is marked `!important` to beat that inline declaration.
+- If the selected element has an inline `!important` declaration for that property, the update is rejected with a message rather than pretending that a lower-priority override succeeded.
+- Managed visual declarations now store an explicit `important` flag in their marker metadata and serialize that flag into the generated CSS rule.
+- The managed marker parser checks for missing, reversed, or duplicate start/end markers, malformed rule metadata, duplicate property records, unexpected text inside the managed region, and mismatch between marker metadata and its CSS rule.
+- If the managed region is ambiguous or malformed, the controller refuses to rebuild it and displays an error toast. The intended safety behavior is to preserve the existing CSS rather than rewrite an ambiguous block.
+- Rebuilding replaces only the managed marker region, preserving CSS text outside it.
+- Preview updates use a separate generated override style element for immediate visual changes; a CSS-sync message updates the managed style element when an override is removed.
+
+**Remaining cascade limitation:** The new priority detection explicitly reports inline declarations. It does not establish a complete cascade analysis for author stylesheet rules that use `!important`, cascade layers, or other specificity/order interactions. These cases need explicit browser tests and a defined policy. Do not claim that every possible author CSS cascade conflict is solved.
+
+#### E. Custom properties
+
+Files: `js/editor/controller.js`, `js/visual/visual-properties.js`, `visual mode.md`
+
+- The controller exposes the custom properties already stored for a supported selector.
+- The property UI remembers the custom property name assigned by its custom-property control for the selected selector.
+- When that control changes the variable name in the current session, it attempts to remove the previous managed override after committing the new one.
+- The updated Persian documentation explicitly says that references in HTML/CSS are not automatically rewritten.
+
+**Remaining limitation:** This is not a general custom-property refactoring tool. It does not discover or rewrite all references, and its assignment tracking is in-memory UI state. Test reload/reselection and multiple existing custom properties before relying on rename behavior.
+
+#### F. Visual Editor documentation
+
+File: `visual mode.md`
+
+The document now describes:
+- disabled controls before an element is selected;
+- native color picker plus text input;
+- sliders for configured numeric-range properties;
+- commit-time unit normalization;
+- CSS value validation;
+- Reset as removal of the Visual Editor override rather than deletion of author CSS;
+- the documented inline-style/`!important` policy;
+- behavior when managed CSS markers are malformed or duplicated;
+- the limitation that custom-property references are not automatically rewritten.
+
+The document still lists 33 groups and notes that States does not create separate pseudo-class rules and that at-rule-based editing is outside the element-property controls.
+
+### 11.2 Status of findings from section 10
+
+| Earlier finding | Status after `c4baf60` | Source-level assessment |
+|---|---|---|
+| VE-01 — stale selection after Visual Mode exit | Addressed in source | Exit calls centralized selection cleanup and sends clear/disable messages. Runtime test still required. |
+| VE-02 — stale selection after preview reload | Addressed in source | iframe load increments document generation and clears selection. Runtime test still required. |
+| VE-03 — old computed values after selecting a new element | Addressed in source | New selection resets visible values and requests the current group's computed styles. |
+| VE-04 — out-of-order computed responses | Addressed in source | Request, selection, and document IDs are checked before applying a response. |
+| VE-05 — controls usable without selection | Addressed in source | Controls are disabled and an empty-state hint is shown until selection. |
+| VE-06 — unit appended on every keystroke | Addressed in source | Unit normalization now happens when committing a value. Test decimals, negatives, explicit units, and all property types. |
+| VE-07 — inline styles defeat persisted visual CSS | Partially addressed | Normal inline declarations are handled using a managed `!important` override; inline `!important` is explicitly rejected. Stylesheet `!important` and broader cascade cases remain unverified. |
+| VE-08 — fragile structural selectors | Partially addressed | Unique safe IDs are preferred. Non-ID targets still use structural paths; class/attribute selector strategy and DOM mutation tracking remain absent. |
+| VE-09 — HTML/BODY selection unavailable | Addressed in source | HTML and BODY can now be selected; HEAD remains excluded. |
+| VE-10 — Shadow DOM support | Still open | No Shadow DOM traversal/selection implementation was added. |
+| VE-11 — limited color controls | Improved | Native color picker and arbitrary CSS color text field added. Alpha/modern color round-trip and browser support need testing. |
+| VE-12 — range properties rendered as selects | Addressed for configured range fields | Real range controls added where the catalog declares `kind: range`; audit the catalog to ensure appropriate fields are configured. |
+| VE-13 — CSS value validation | Improved | Uses `CSS.supports()` for ordinary properties and separate custom-property handling. Test empty values, vendor-specific values, shorthands, and browser support. |
+| VE-14 — property removal semantics | Improved | Reset removes the managed override. Verify that all controls and existing marker blocks behave correctly and that author CSS remains intact. |
+| VE-15 — custom property rename | Partially addressed | The prior managed override is removed for names tracked by the control in the current session; references are not rewritten and broader rename cases remain unsupported. |
+| VE-16 — preserving current/arbitrary values | Improved | Current values are added to selects; text/color inputs allow arbitrary values subject to validation. Test each control kind. |
+| VE-17 — complete responsive breakpoint editor | Still open | No media-query/breakpoint authoring workflow was added. |
+| VE-18 — pseudo-class state editor | Still open | States remains a set of ordinary selected-element properties, not a `:hover`/`:focus` rule editor. |
+| VE-19 — pseudo-element editor | Still open | No independent `::before`/`::after` target workflow was added. |
+| VE-20 — keyframe animation editor | Still open | No dedicated `@keyframes` editor was added. |
+| VE-21 — advanced Grid/Flexbox editing | Not established | The commit does not demonstrate comprehensive new Grid/Flexbox coverage. |
+| VE-22 — postMessage correlation/validation | Improved | Source checks, request IDs, and generation IDs were added. Test malformed messages and lifecycle races. |
+| VE-23 — invalid selectors/deleted elements | Improved | Preview checks connectivity/selector consistency and reports invalid selection. Test DOM mutations and selector edge cases. |
+| VE-24 — managed CSS marker robustness | Improved | Ambiguous/malformed marker blocks are detected and rebuild is refused. Test partial edits, CRLF, empty blocks, duplicate rules, and unusual whitespace. |
+| VE-25 — Monaco/CodeMirror synchronization | Not verified by this commit | Existing synchronization code remains; no runtime evidence for cursor, undo/redo, or both engines. |
+| VE-26 — repeated full CSS work on every keystroke | Partially improved | Text fields now commit on change rather than every keystroke. Slider/color inputs still commit during input interaction; performance on large documents is untested. |
+
+### 11.3 New risks and code paths requiring tests
+
+1. **Managed marker parser compatibility:** Test existing CSS blocks created by the earlier implementation, including CRLF files, empty marker blocks, multiple declarations, and unusual whitespace. A parser that is too strict may correctly avoid data loss but may also refuse to edit a valid legacy block.
+2. **Marker conflict recovery:** Verify that a conflict does not mutate `values.css`, editor contents, preview CSS, or persisted localStorage. Verify how a user can manually recover a malformed block.
+3. **CSS cascade:** Test ordinary inline styles, inline `!important`, author stylesheet `!important`, duplicate selectors, specificity, and source order. Confirm that the preview and persisted CSS agree.
+4. **Immediate preview vs persisted CSS:** Test repeated property changes, Reset, preview refresh, manual Run, and full page reload. Confirm that the temporary override style and managed CSS style never diverge.
+5. **Selection generations:** Rapidly select several elements, reload the preview while requests are pending, exit/re-enter Visual Mode, and delete the selected node. Confirm that stale responses cannot update controls or styles.
+6. **Selector correctness:** Test unique IDs, duplicate IDs, IDs with punctuation/non-ASCII characters, nested same-tag siblings, insertion/removal/reordering of siblings, and HTML/BODY targets. Confirm that unsupported selectors fail safely rather than targeting a different node.
+7. **Color controls:** Test HEX, RGB/RGBA, HSL/HSLA, named colors, `currentColor`, CSS variables, alpha transparency, and invalid text. A native color input cannot represent every CSS color syntax or alpha value, so the text input must remain authoritative for unsupported forms.
+8. **Range controls:** Audit all `kind: range` definitions for correct min/max/step and units. Test computed values outside the slider range and verify the text field does not silently truncate valid CSS values.
+9. **Reset behavior:** Confirm Reset removes only the managed override and that the displayed value returns to the actual computed value after a fresh request, rather than merely showing a static default.
+10. **Custom properties:** Test one and multiple existing custom properties, changing names, clearing values, changing selected elements, switching groups, and reloading the page. Confirm no unrelated variable is deleted.
+11. **Security and message protocol:** The handlers check `event.source`; continue to validate every message payload and keep the iframe sandbox unchanged. Do not treat source checks as a complete security audit.
+12. **Editor synchronization:** Test Monaco and CodeMirror separately, including undo/redo, cursor/selection position, manual edits to the managed block, and Visual Editor operations on large CSS documents.
+13. **Accessibility and layout:** Test keyboard access to color/range/reset controls, focus visibility, screen-reader labels/status, narrow inspector widths, and overflow in the right sidebar.
+14. **Offline regression:** Confirm the new code uses only local assets and does not introduce any network dependency.
+
+### 11.4 Updated next actions
+
+1. Run browser tests for the VE-01 through VE-06 fixes first; these are implemented in source but have not yet been runtime-verified.
+2. Test VE-07 against the full CSS cascade, especially stylesheet-level `!important`.
+3. Test managed marker migration/compatibility with CSS generated before commit `c4baf60`.
+4. Verify all 33 property groups, paying special attention to range field metadata and color values that cannot round-trip through a native color input.
+5. Verify the Visual Editor in both Monaco and CodeMirror, including undo/redo and large documents.
+6. Update the acceptance checklist in section 10 only after real browser tests pass. Keep source-implemented and runtime-verified status separate.
+7. Treat Shadow DOM, media-query editing, pseudo-class/pseudo-element editing, keyframes, and advanced Grid/Flexbox authoring as remaining feature work unless subsequent commits implement them.
+
+**Current confidence:** The new source contains substantial, targeted improvements to the Visual Editor and addresses several previously identified defects at the implementation level. No runtime test evidence was available during this review, so do not describe the Visual Editor as fully fixed or complete.
