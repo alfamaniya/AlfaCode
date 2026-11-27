@@ -1,6 +1,12 @@
 (function () {
   "use strict";
   var monacoPromise = null;
+  window.addEventListener("alfa-code:theme-change", function (event) {
+    if (window.monaco && window.monaco.editor) {
+      window.monaco.editor.setTheme(event.detail.theme === "light" ? "vs" : "vs-dark");
+    }
+  });
+
   function loadMonaco() {
     if (monacoPromise) return monacoPromise;
     monacoPromise = new Promise(function (resolve, reject) {
@@ -21,7 +27,7 @@
       var editor = monaco.editor.create(surface, {
         value: context.values[key],
         language: context.languageByTab[key],
-        theme: "vs-dark",
+        theme: document.documentElement.getAttribute("data-color-theme") === "light" ? "vs" : "vs-dark",
         automaticLayout: true,
         minimap: { enabled: true },
         scrollBeyondLastLine: false,

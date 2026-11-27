@@ -2,9 +2,10 @@
   "use strict";
   function bind(frame) {
     var visualMode = false;
-    var visualButton = document.querySelector('[aria-label="Visual edit"]');
+    var selectedLabel = null;
     var rightSidebar = document.getElementById("sidebarRight");
     var rightToggle = document.getElementById("rightToggle");
+    var visualModeExit = document.getElementById("visualModeExit");
     var visualSelection = document.getElementById("visualInspectorSelection");
     var visualGroups = document.getElementById("visualGroups");
     var visualGroupDetail = document.getElementById("visualGroupDetail");
@@ -19,22 +20,23 @@
 
     function updateInspector(label) {
       if (!label || !visualSelection) return;
-      visualSelection.textContent = label;
+      selectedLabel = label;
+      visualSelection.textContent = "Selected: " + selectedLabel;
     }
 
     if (visualGroups && visualGroupDetail && visualGroupTitle && visualGroupBack) {
-      function showGroupTooltip(button) {
+      function showGroupTooltip(button, pointerX, pointerY) {
         if (!visualTooltip || !button) return;
         visualTooltip.textContent = button.getAttribute("data-tooltip") || button.getAttribute("aria-label") || "";
         var rect = button.getBoundingClientRect();
         visualTooltip.classList.add("is-visible");
         visualTooltip.setAttribute("aria-hidden", "false");
         var tooltipRect = visualTooltip.getBoundingClientRect();
-        var left = rect.right + 8;
-        if (left + tooltipRect.width > window.innerWidth - 8) left = rect.left - tooltipRect.width - 8;
-        left = Math.max(8, Math.min(left, window.innerWidth - tooltipRect.width - 8));
-        var top = rect.top + (rect.height - tooltipRect.height) / 2;
-        top = Math.max(8, Math.min(top, window.innerHeight - tooltipRect.height - 8));
+        var anchorX = typeof pointerX === "number" ? pointerX : rect.left + rect.width / 2;
+        var anchorY = typeof pointerY === "number" ? pointerY : rect.top;
+        var left = Math.max(8, Math.min(anchorX - tooltipRect.width / 2, window.innerWidth - tooltipRect.width - 8));
+        var top = anchorY - tooltipRect.height - 10;
+        if (top < 8) top = Math.min(window.innerHeight - tooltipRect.height - 8, anchorY + 10);
         visualTooltip.style.left = left + "px";
         visualTooltip.style.top = top + "px";
       }
@@ -47,7 +49,13 @@
 
       visualGroups.addEventListener("pointerover", function (event) {
         var button = event.target.closest("[data-visual-group]");
-        if (button && !button.contains(event.relatedTarget)) showGroupTooltip(button);
+        if (button && !button.contains(event.relatedTarget)) showGroupTooltip(button, event.clientX, event.clientY);
+      });
+      visualGroups.addEventListener("pointermove", function (event) {
+        var button = event.target.closest("[data-visual-group]");
+        if (button && visualTooltip && visualTooltip.classList.contains("is-visible")) {
+          showGroupTooltip(button, event.clientX, event.clientY);
+        }
       });
       visualGroups.addEventListener("pointerout", function (event) {
         var button = event.target.closest("[data-visual-group]");
@@ -77,7 +85,8 @@
     if (frame) {
       frame.addEventListener("load", function () {
         if (visualMode) {
-          visualSelection.textContent = "Select an element in the preview.";
+          selectedLabel = null;
+          visualSelection.textContent = "No element selected";
         }
         sendVisualMode();
       });
@@ -85,6 +94,13 @@
         if (event.source !== frame.contentWindow || !event.data || typeof event.data !== "object") return;
         if (event.data.type === "alfa-visual-ready") {
           sendVisualMode();
+        } else if (event.data.type === "alfa-visual-exit") {
+          document.dispatchEvent(new Event("alfa-code:visual-mode-exit-request"));
+        } else if (event.data.type === "alfa-visual-hover" &&
+            typeof event.data.label === "string" && !selectedLabel && visualSelection) {
+          visualSelection.textContent = "Hovering: " + event.data.label;
+        } else if (event.data.type === "alfa-visual-hover-clear" && !selectedLabel && visualSelection) {
+          visualSelection.textContent = "No element selected";
         } else if (event.data.type === "alfa-visual-selection" &&
             typeof event.data.selector === "string" &&
             /^body(?: > [a-z0-9:-]+(?:\(\d+\))?)+(?:\:not\(#[a-z0-9_-]+\))?$/.test(event.data.selector)) {
@@ -93,31 +109,32 @@
       });
     }
 
-    if (visualButton && rightSidebar && rightToggle) {
+    if (rightSidebar && rightToggle) {
+      function enterVisualMode() {
+        if (visualMode) return;
+        visualMode = true;
+        rightSidebar.classList.add("is-inspecting");
+        document.querySelector("#sidebarRight .sidebar-title").textContent = "Visual Editor";
+        document.dispatchEvent(new Event("alfa-code:open-right-sidebar"));
+        sendVisualMode();
+      }
+
       function exitVisualMode() {
+        if (!visualMode) return;
         visualMode = false;
-        visualButton.setAttribute("aria-pressed", "false");
-        visualButton.classList.remove("is-active");
+        selectedLabel = null;
         rightSidebar.classList.remove("is-inspecting");
         document.querySelector("#sidebarRight .sidebar-title").textContent = "Menu";
         visualSelection.textContent = "No element selected";
         if (visualGroupDetail) visualGroupDetail.hidden = true;
         if (visualGroups) visualGroups.hidden = false;
         sendVisualMode();
+        document.dispatchEvent(new Event("alfa-code:visual-mode-exit"));
       }
 
-      visualButton.addEventListener("click", function () {
-        if (visualMode) exitVisualMode();
-        else {
-          visualMode = true;
-          visualButton.setAttribute("aria-pressed", "true");
-          visualButton.classList.add("is-active");
-          rightSidebar.classList.add("is-inspecting");
-          document.querySelector("#sidebarRight .sidebar-title").textContent = "Visual Editor";
-          document.dispatchEvent(new Event("alfa-code:open-right-sidebar"));
-        }
-        sendVisualMode();
-      });
+      document.addEventListener("alfa-code:visual-mode-enter", enterVisualMode);
+      document.addEventListener("alfa-code:visual-mode-exit-request", exitVisualMode);
+      if (visualModeExit) visualModeExit.addEventListener("click", exitVisualMode);
 
       rightToggle.addEventListener("click", function () {
         if (visualMode && rightToggle.getAttribute("aria-expanded") !== "true") exitVisualMode();

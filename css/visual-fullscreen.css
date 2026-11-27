@@ -1,0 +1,63 @@
+:root[data-visual-fullscreen="true"] .header,
+:root[data-visual-fullscreen="true"] .footer,
+:root[data-visual-fullscreen="true"] #sidebarLeft,
+:root[data-visual-fullscreen="true"] #leftResizer,
+:root[data-visual-fullscreen="true"] #rightResizer,
+:root[data-visual-fullscreen="true"] #main .pane.left,
+:root[data-visual-fullscreen="true"] #main .split-divider{
+  display: none !important;
+}
+
+:root[data-visual-fullscreen="true"] #main{
+  position: fixed;
+  z-index: 200;
+  inset: 0 clamp(260px, 28vw, 380px) 0 0;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0;
+  transition: none;
+}
+
+:root[data-visual-fullscreen="true"] #main .split{
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-visual-fullscreen="true"] #main .pane.right{
+  display: flex !important;
+  flex: 1 1 100%;
+}
+
+:root[data-visual-fullscreen="true"] #sidebarRight{
+  position: fixed;
+  z-index: 210;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: clamp(260px, 28vw, 380px) !important;
+  border-radius: 0;
+  box-shadow: var(--sh-b-left);
+}
+
+:root[data-visual-fullscreen="true"] #sidebarRight.is-open{
+  width: clamp(260px, 28vw, 380px) !important;
+}
+
+:root[data-visual-fullscreen="true"] #sidebarRight .sidebar-head{
+  flex-basis: var(--sidebar-head-h);
+}
+
+@media (max-width: 640px){
+  :root[data-visual-fullscreen="true"] #main{
+    inset: 0 0 42vh;
+  }
+
+  :root[data-visual-fullscreen="true"] #sidebarRight{
+    top: auto;
+    width: 100% !important;
+    height: 42vh;
+    min-height: 220px;
+    border-radius: 0;
+    box-shadow: var(--sh-b-top);
+  }
+}

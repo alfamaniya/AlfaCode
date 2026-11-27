@@ -170,7 +170,7 @@
   }
   .editor-surface--codemirror6 .cm-selectionBackground,
   .editor-surface--codemirror6 .cm-content ::selection{
-    background: rgba(69, 216, 232, .28) !important;
+    background: var(--c-tint-14) !important;
   }
   .editor-surface--codemirror6 .cm-tooltip{
     color: var(--c-text);

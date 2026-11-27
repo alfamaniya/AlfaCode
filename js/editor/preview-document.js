@@ -30,9 +30,53 @@
   function visualEditorBootstrap() {
     var visualMode = false;
     var selectedElement = null;
+    var hoveredElement = null;
     var overlay = document.createElement("style");
-    overlay.textContent = "html.alfa-visual-mode, html.alfa-visual-mode * { cursor: crosshair !important; } [data-alfa-visual-selected] { outline: 2px solid #ff8a00 !important; outline-offset: 2px !important; }";
+    overlay.textContent = "html.alfa-visual-mode, html.alfa-visual-mode * { cursor: crosshair !important; } [data-alfa-visual-hovered] { outline: 2px solid #45d8e8 !important; outline-offset: 2px !important; } [data-alfa-visual-selected] { outline: 2px solid #ff8a00 !important; outline-offset: 2px !important; } #alfa-visual-hover-label { position: fixed; z-index: 2147483647; max-width: min(320px, calc(100vw - 16px)); padding: 5px 8px; border: 1px solid #45d8e8; border-radius: 6px; background: #04141a; color: #d6f5fb; box-shadow: 0 0 12px rgba(69,216,232,.28); font: 12px/1.35 system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }";
     document.head.appendChild(overlay);
+
+    var hoverLabel = document.createElement("div");
+    hoverLabel.id = "alfa-visual-hover-label";
+    hoverLabel.hidden = true;
+    hoverLabel.setAttribute("aria-hidden", "true");
+    document.body.appendChild(hoverLabel);
+
+    function labelFor(element) {
+      var label = element.tagName.toLowerCase();
+      if (element.id) label += "#" + element.id;
+      if (element.classList.length) label += "." + Array.prototype.join.call(element.classList, ".");
+      return label;
+    }
+
+    function clearHover() {
+      if (hoveredElement) parent.postMessage({ type: "alfa-visual-hover-clear" }, "*");
+      if (hoveredElement) hoveredElement.removeAttribute("data-alfa-visual-hovered");
+      hoveredElement = null;
+      hoverLabel.hidden = true;
+    }
+
+    function showHover(element, event) {
+      if (!element || /^(HTML|HEAD|BODY|SCRIPT|STYLE)$/.test(element.tagName)) {
+        clearHover();
+        return;
+      }
+
+      if (hoveredElement !== element) {
+        if (hoveredElement) hoveredElement.removeAttribute("data-alfa-visual-hovered");
+        hoveredElement = element;
+        hoveredElement.setAttribute("data-alfa-visual-hovered", "");
+        var label = labelFor(element);
+        hoverLabel.textContent = label;
+        parent.postMessage({ type: "alfa-visual-hover", label: label }, "*");
+      }
+
+      hoverLabel.hidden = false;
+      var left = Math.max(8, Math.min(event.clientX - hoverLabel.offsetWidth / 2, window.innerWidth - hoverLabel.offsetWidth - 8));
+      var top = event.clientY - hoverLabel.offsetHeight - 12;
+      if (top < 8) top = Math.min(window.innerHeight - hoverLabel.offsetHeight - 8, event.clientY + 16);
+      hoverLabel.style.left = left + "px";
+      hoverLabel.style.top = top + "px";
+    }
 
     function selectorFor(element) {
       var selected = element;
@@ -57,15 +101,20 @@
         item.removeAttribute("data-alfa-visual-selected");
       });
       selectedElement.setAttribute("data-alfa-visual-selected", "");
-      var label = selectedElement.tagName.toLowerCase();
-      if (selectedElement.id) label += "#" + selectedElement.id;
-      else if (selectedElement.classList.length) label += "." + Array.prototype.join.call(selectedElement.classList, ".");
       parent.postMessage({
         type: "alfa-visual-selection",
         selector: selectorFor(selectedElement),
-        label: label
+        label: labelFor(selectedElement)
       }, "*");
     }
+
+    document.addEventListener("mousemove", function (event) {
+      if (!visualMode) return;
+      var element = event.target.nodeType === 1 ? event.target : event.target.parentElement;
+      showHover(element, event);
+    }, true);
+
+    document.addEventListener("mouseleave", clearHover);
 
     document.addEventListener("click", function (event) {
       if (!visualMode) return;
@@ -74,6 +123,12 @@
       event.preventDefault();
       event.stopPropagation();
       sendSelection(element);
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+      if (visualMode && event.key === "Escape") {
+        parent.postMessage({ type: "alfa-visual-exit" }, "*");
+      }
     }, true);
 
     window.addEventListener("message", function (event) {
@@ -86,6 +141,7 @@
           selectedElement.removeAttribute("data-alfa-visual-selected");
           selectedElement = null;
         }
+        if (!visualMode) clearHover();
       }
     });
 

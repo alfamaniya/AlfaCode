@@ -26,15 +26,15 @@
       border-radius: 0 var(--r-md) var(--r-md) 0;
       box-shadow:
         var(--sh-b-right),
-        0 0 0 100vmax rgba(0, 0, 0, .35),
-        0 0 48px rgba(0, 0, 0, .7);
+        0 0 0 100vmax var(--c-overlay),
+        0 0 48px var(--c-drawer-shadow);
     }
     .sidebar--right.is-open{
       border-radius: var(--r-md) 0 0 var(--r-md);
       box-shadow:
         var(--sh-b-left),
-        0 0 0 100vmax rgba(0, 0, 0, .35),
-        0 0 48px rgba(0, 0, 0, .7);
+        0 0 0 100vmax var(--c-overlay),
+        0 0 48px var(--c-drawer-shadow);
     }
     .sidebar-resizer{ display: none; }
 
