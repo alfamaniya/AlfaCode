@@ -58,8 +58,14 @@
   };
 
   var storageKeys = { html: "alfa-code:html", css: "alfa-code:css", js: "alfa-code:js" };
+  var auxiliaryStorageKeys = {
+    visualEdits: "alfa-code:visual-edits",
+    visualGeneratedRules: "alfa-code:visual-generated-rules"
+  };
   var storageBaseline = {};
+  var auxiliaryBaseline = {};
   var dirtyKeys = { html: false, css: false, js: false };
+  var auxiliaryDirty = { visualEdits: false, visualGeneratedRules: false };
   var storageConflicts = {};
   var recoveryTabId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
 
@@ -80,6 +86,9 @@
 
   tabKeys.forEach(function (key) {
     storageBaseline[key] = readStorageRaw(storageKeys[key]);
+  });
+  Object.keys(auxiliaryStorageKeys).forEach(function (key) {
+    auxiliaryBaseline[key] = readStorageRaw(auxiliaryStorageKeys[key]);
   });
 
   function markDirty(key) {
@@ -454,8 +463,8 @@
   }
 
   function saveVisualEditState() {
-    save("alfa-code:visual-edits", visualEditStates);
-    save("alfa-code:visual-generated-rules", visualGeneratedRules);
+    auxiliaryDirty.visualEdits = true;
+    auxiliaryDirty.visualGeneratedRules = true;
   }
 
   function migrateLegacyVisualCss() {
@@ -575,6 +584,49 @@
         showToast("Could not save " + key.toUpperCase() + ". Your current edits remain open in this tab.", true);
       }
     });
+    Object.keys(auxiliaryStorageKeys).forEach(function (key) {
+      if (!auxiliaryDirty[key]) return;
+      var currentValue = key === "visualEdits" ? visualEditStates : visualGeneratedRules;
+      var serialized = JSON.stringify(currentValue);
+      var latestRaw = readStorageRaw(auxiliaryStorageKeys[key]);
+      if (latestRaw === undefined) {
+        showToast("Browser storage is unavailable. Visual edit metadata remains only in this tab.", true);
+        return;
+      }
+      if (latestRaw !== auxiliaryBaseline[key] && latestRaw !== serialized) {
+        var recoveryKey = saveRecoveryCopy(key, currentValue);
+        var note = recoveryKey ? " A recovery copy was kept in this browser." : " The recovery copy could not be saved.";
+        if (!window.confirm(
+          "Another tab changed Visual Editor metadata.\n\n" +
+          "OK: keep this tab's metadata and replace the newer saved version.\n" +
+          "Cancel: load the newer metadata." + note
+        )) {
+          try {
+            var remote = latestRaw === null ? {} : JSON.parse(latestRaw);
+            if (!remote || typeof remote !== "object" || Array.isArray(remote)) throw new Error("Invalid metadata");
+            if (key === "visualEdits") visualEditStates = remote;
+            else visualGeneratedRules = remote;
+            auxiliaryBaseline[key] = latestRaw;
+            auxiliaryDirty[key] = false;
+          } catch (error) {
+            showToast("The newer Visual Editor metadata could not be read; local metadata was kept.", true);
+          }
+          return;
+        }
+        if (readStorageRaw(auxiliaryStorageKeys[key]) !== latestRaw) {
+          showToast("Visual Editor metadata changed again. Save paused to avoid overwriting it.", true);
+          return;
+        }
+      }
+      try {
+        localStorage.setItem(auxiliaryStorageKeys[key], serialized);
+        auxiliaryBaseline[key] = serialized;
+        auxiliaryDirty[key] = false;
+      } catch (error) {
+        console.error("[Alfa-Code] Could not save Visual Editor metadata:", error);
+        showToast("Could not save Visual Editor metadata. Current edits remain open.", true);
+      }
+    });
   }
 
   function flushPersist() {
@@ -607,6 +659,23 @@
         dirtyKeys[key] = false;
       } catch (error) {
         console.warn("[Alfa-Code] Final save failed for " + key + ":", error);
+      }
+    });
+    Object.keys(auxiliaryStorageKeys).forEach(function (key) {
+      if (!auxiliaryDirty[key]) return;
+      var value = key === "visualEdits" ? visualEditStates : visualGeneratedRules;
+      var serialized = JSON.stringify(value);
+      var latestRaw = readStorageRaw(auxiliaryStorageKeys[key]);
+      if (latestRaw !== auxiliaryBaseline[key] && latestRaw !== serialized) {
+        saveRecoveryCopy(key, value);
+        return;
+      }
+      try {
+        localStorage.setItem(auxiliaryStorageKeys[key], serialized);
+        auxiliaryBaseline[key] = serialized;
+        auxiliaryDirty[key] = false;
+      } catch (error) {
+        console.warn("[Alfa-Code] Final Visual Editor metadata save failed:", error);
       }
     });
   }
@@ -688,14 +757,34 @@
     var key = Object.keys(storageKeys).filter(function (candidate) {
       return storageKeys[candidate] === event.key;
     })[0];
-    if (!key) return;
-
-    if (dirtyKeys[key]) {
-      storageConflicts[key] = event.newValue;
-      showToast("Another tab changed " + key.toUpperCase() + ". Your local edits are being kept until the conflict is resolved.", true);
+    if (key) {
+      if (dirtyKeys[key]) {
+        storageConflicts[key] = event.newValue;
+        showToast("Another tab changed " + key.toUpperCase() + ". Your local edits are being kept until the conflict is resolved.", true);
+        return;
+      }
+      applyRemoteCode(key, event.newValue);
       return;
     }
-    applyRemoteCode(key, event.newValue);
+
+    var auxiliaryKey = Object.keys(auxiliaryStorageKeys).filter(function (candidate) {
+      return auxiliaryStorageKeys[candidate] === event.key;
+    })[0];
+    if (!auxiliaryKey) return;
+    if (auxiliaryDirty[auxiliaryKey]) {
+      storageConflicts[auxiliaryKey] = event.newValue;
+      showToast("Another tab changed Visual Editor metadata. Your local metadata is being kept until the conflict is resolved.", true);
+      return;
+    }
+    try {
+      var remote = event.newValue === null ? {} : JSON.parse(event.newValue);
+      if (!remote || typeof remote !== "object" || Array.isArray(remote)) throw new Error("Invalid metadata");
+      if (auxiliaryKey === "visualEdits") visualEditStates = remote;
+      else visualGeneratedRules = remote;
+      auxiliaryBaseline[auxiliaryKey] = event.newValue;
+    } catch (error) {
+      showToast("Could not read updated Visual Editor metadata from another tab.", true);
+    }
   });
 
   function setValues(nextValues) {
