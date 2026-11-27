@@ -56,6 +56,35 @@
     css: loadString("alfa-code:css", DEFAULT_CSS),
     js: loadString("alfa-code:js", DEFAULT_JS)
   };
+
+  var storageKeys = { html: "alfa-code:html", css: "alfa-code:css", js: "alfa-code:js" };
+  var storageBaseline = {};
+  var dirtyKeys = { html: false, css: false, js: false };
+  var storageConflicts = {};
+  var recoveryTabId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+
+  function readStorageRaw(key) {
+    try { return localStorage.getItem(key); }
+    catch (error) { return undefined; }
+  }
+
+  function decodeStoredCode(raw, key) {
+    if (raw === null) return key === "html" ? DEFAULT_HTML : (key === "css" ? DEFAULT_CSS : DEFAULT_JS);
+    try {
+      var parsed = JSON.parse(raw);
+      return typeof parsed === "string" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  tabKeys.forEach(function (key) {
+    storageBaseline[key] = readStorageRaw(storageKeys[key]);
+  });
+
+  function markDirty(key) {
+    if (Object.prototype.hasOwnProperty.call(dirtyKeys, key)) dirtyKeys[key] = true;
+  }
   var visualSelector = null;
   var visualContext = { documentGeneration: 0, selectionGeneration: 0, matchedRules: [] };
   var visualRules = {};
@@ -452,6 +481,7 @@
       });
     });
     values.css = css;
+    markDirty("css");
     visualRules = {};
     visualCssConflict = false;
     return true;
@@ -472,12 +502,116 @@
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(flushPersist, 400);
   }
+
+  function saveRecoveryCopy(key, value) {
+    var recoveryKey = "alfa-code:recovery:" + recoveryTabId + ":" + key;
+    try {
+      localStorage.setItem(recoveryKey, JSON.stringify({
+        key: key,
+        value: value,
+        savedAt: new Date().toISOString()
+      }));
+      return recoveryKey;
+    } catch (error) {
+      console.error("[Alfa-Code] Could not preserve the conflicting local draft:", error);
+      return null;
+    }
+  }
+
+  function applyRemoteCode(key, raw) {
+    var remoteValue = decodeStoredCode(raw, key);
+    if (remoteValue === null) {
+      showToast("A newer " + key.toUpperCase() + " version could not be read. Your local content was kept.", true);
+      return false;
+    }
+    values[key] = remoteValue;
+    storageBaseline[key] = raw;
+    dirtyKeys[key] = false;
+    delete storageConflicts[key];
+    if (key === "css") refreshVisualRules();
+    syncExistingEditors();
+    schedule();
+    return true;
+  }
+
+  function flushDirtyKeys() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    tabKeys.forEach(function (key) {
+      if (!dirtyKeys[key]) return;
+      var snapshot = values[key];
+      var serialized = JSON.stringify(snapshot);
+      var latestRaw = readStorageRaw(storageKeys[key]);
+      if (latestRaw === undefined) {
+        showToast("Browser storage is unavailable. Your " + key.toUpperCase() + " changes remain only in this tab.", true);
+        return;
+      }
+
+      if (latestRaw !== storageBaseline[key] && latestRaw !== serialized) {
+        var recoveryKey = saveRecoveryCopy(key, snapshot);
+        var recoveryNote = recoveryKey ? " A recovery copy was kept in this browser." : " The recovery copy could not be saved.";
+        var keepLocal = window.confirm(
+          "Another tab changed " + key.toUpperCase() + " after you started editing it.\n\n" +
+          "OK: keep this tab's version and replace the newer saved version.\n" +
+          "Cancel: load the newer saved version in this tab." + recoveryNote
+        );
+        if (!keepLocal) {
+          applyRemoteCode(key, latestRaw);
+          return;
+        }
+        var confirmedRaw = readStorageRaw(storageKeys[key]);
+        if (confirmedRaw !== latestRaw) {
+          storageConflicts[key] = confirmedRaw;
+          showToast("The saved " + key.toUpperCase() + " changed again. Save paused; review the conflict before continuing.", true);
+          return;
+        }
+      }
+
+      try {
+        localStorage.setItem(storageKeys[key], serialized);
+        storageBaseline[key] = serialized;
+        if (values[key] === snapshot) dirtyKeys[key] = false;
+      } catch (error) {
+        console.error("[Alfa-Code] Could not save " + key + ":", error);
+        showToast("Could not save " + key.toUpperCase() + ". Your current edits remain open in this tab.", true);
+      }
+    });
+  }
+
   function flushPersist() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    tabKeys.forEach(function (key) { save("alfa-code:" + key, values[key]); });
-    save("alfa-code:editor", activeEngine);
+    if (navigator.locks && typeof navigator.locks.request === "function") {
+      return navigator.locks.request("alfa-code:code-storage-write", { mode: "exclusive" }, flushDirtyKeys)
+        .catch(function (error) {
+          console.error("[Alfa-Code] Could not acquire the shared storage lock:", error);
+          showToast("Could not safely synchronize saved code. Your edits remain open in this tab.", true);
+        });
+    }
+    // Older browsers use a guarded compare-before-write fallback. localStorage has no
+    // atomic compare-and-swap, so this fallback cannot guarantee safety for exact races.
+    return Promise.resolve().then(flushDirtyKeys);
   }
-  window.addEventListener("beforeunload", flushPersist);
+
+  function flushPersistOnExit() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    tabKeys.forEach(function (key) {
+      if (!dirtyKeys[key]) return;
+      var serialized = JSON.stringify(values[key]);
+      var latestRaw = readStorageRaw(storageKeys[key]);
+      if (latestRaw !== storageBaseline[key] && latestRaw !== serialized) {
+        saveRecoveryCopy(key, values[key]);
+        return;
+      }
+      try {
+        localStorage.setItem(storageKeys[key], serialized);
+        storageBaseline[key] = serialized;
+        dirtyKeys[key] = false;
+      } catch (error) {
+        console.warn("[Alfa-Code] Final save failed for " + key + ":", error);
+      }
+    });
+  }
+
+  window.addEventListener("beforeunload", flushPersistOnExit);
 
   function schedule() {
     if (renderTimer) clearTimeout(renderTimer);
@@ -492,6 +626,7 @@
   function handleChange(key, value) {
     if (suppressChanges) return;
     values[key] = value;
+    markDirty(key);
     if (key === "css") {
       refreshVisualRules();
       visualGeneratedRules = {};
@@ -548,6 +683,21 @@
     }
   }
 
+  window.addEventListener("storage", function (event) {
+    if (event.storageArea !== localStorage) return;
+    var key = Object.keys(storageKeys).filter(function (candidate) {
+      return storageKeys[candidate] === event.key;
+    })[0];
+    if (!key) return;
+
+    if (dirtyKeys[key]) {
+      storageConflicts[key] = event.newValue;
+      showToast("Another tab changed " + key.toUpperCase() + ". Your local edits are being kept until the conflict is resolved.", true);
+      return;
+    }
+    applyRemoteCode(key, event.newValue);
+  });
+
   function setValues(nextValues) {
     if (typeof nextValues.css === "string") {
       visualEditStates = {};
@@ -555,7 +705,10 @@
       saveVisualEditState();
     }
     tabKeys.forEach(function (key) {
-      if (typeof nextValues[key] === "string") values[key] = nextValues[key];
+      if (typeof nextValues[key] === "string" && values[key] !== nextValues[key]) {
+        values[key] = nextValues[key];
+        markDirty(key);
+      }
     });
     refreshVisualRules();
     syncExistingEditors();
@@ -731,6 +884,7 @@
       }
 
       refreshVisualRules();
+      markDirty("css");
       saveVisualEditState();
       if (frame && frame.contentWindow) {
         frame.contentWindow.postMessage({
@@ -768,7 +922,13 @@
   function switchToEngine(nextEngine, persistSetting) {
     if (nextEngine === activeEngine) return;
     saveSelection();
-    if (getCurrentEditor()) values[activeTab] = getCurrentEditor().getValue();
+    if (getCurrentEditor()) {
+      var editorValue = getCurrentEditor().getValue();
+      if (values[activeTab] !== editorValue) {
+        values[activeTab] = editorValue;
+        markDirty(activeTab);
+      }
+    }
     syncExistingEditors();
     ensureEditor(nextEngine, activeTab).then(function () {
       activeEngine = nextEngine;
@@ -858,8 +1018,15 @@
     var editor = getCurrentEditor();
     if (editor) editor.replaceSelection(parts.html);
     values.html = editor ? editor.getValue() : parts.html;
-    if (parts.css) values.css = values.css ? values.css.replace(/\s+$/, "") + "\n\n" + parts.css : parts.css;
-    if (parts.js) values.js = values.js ? values.js.replace(/\s+$/, "") + "\n\n" + parts.js : parts.js;
+    markDirty("html");
+    if (parts.css) {
+      values.css = values.css ? values.css.replace(/\s+$/, "") + "\n\n" + parts.css : parts.css;
+      markDirty("css");
+    }
+    if (parts.js) {
+      values.js = values.js ? values.js.replace(/\s+$/, "") + "\n\n" + parts.js : parts.js;
+      markDirty("js");
+    }
     refreshVisualRules();
     syncExistingEditors();
     persist();
