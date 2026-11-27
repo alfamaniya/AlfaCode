@@ -201,7 +201,8 @@
       visualSelector = typeof selector === "string" ? selector : null;
     },
     setVisualProperty: function (property, value) {
-      if (!property || /^--alfa-/.test(property)) return;
+      if (typeof property !== "string" ||
+          !(/^[a-z][a-z0-9-]*$/i.test(property) || /^--(?!alfa-)[a-z0-9_-]+$/i.test(property))) return;
       if (frame && frame.contentWindow) {
         frame.contentWindow.postMessage({ type: "alfa-visual-property", property: property, value: value }, "*");
       }

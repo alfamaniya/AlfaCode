@@ -1,1 +1,28 @@
-(function(){'use strict';var P=window.AlfaCodeVisualProperties,Pf=P.field,Ps=P.section;P.register('states',{sections:[Ps('Interactive state',[Pf('Hover background','--alfa-hover-background','color'),Pf('Hover opacity','--alfa-hover-opacity','range',{min:0,max:1,step:.05})]),Ps('Selection',[Pf('Selection background','--alfa-selection-background','color'),Pf('Selection color','--alfa-selection-color','color')]),Ps('Pseudo state',[Pf('Custom pseudo target','--alfa-pseudo-selector','text')])]});})();
+(function () {
+  "use strict";
+  var properties = window.AlfaCodeVisualProperties;
+  properties.register("states", {
+    sections: [
+      properties.section("Interactive appearance", [
+        properties.field("Accent color", "accent-color", "color"),
+        properties.field("Caret color", "caret-color", "color"),
+        properties.field("Selection", "user-select", "select", {
+          options: [
+            { value: "auto", label: "Auto" }, { value: "text", label: "Text" },
+            { value: "none", label: "None" }, { value: "all", label: "All" }
+          ]
+        })
+      ]),
+      properties.section("Focus state", [
+        properties.field("Outline style", "outline-style", "select", {
+          options: [
+            { value: "auto", label: "Auto" }, { value: "none", label: "None" },
+            { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" },
+            { value: "dotted", label: "Dotted" }
+          ]
+        }),
+        properties.field("Outline color", "outline-color", "color")
+      ])
+    ]
+  });
+})();
