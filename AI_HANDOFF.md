@@ -1,0 +1,412 @@
+# AlfaCode — AI Engineering Handoff & Repository Review
+
+> **Purpose:** This document is the working handoff for the next AI coding assistant (especially GitHub Copilot in VS Code). Read it before changing code. It records the repository identity, the review scope, observed issues, unverified risks, and a concrete verification plan. Treat it as project-specific engineering context, not as permission to make broad redesigns.
+
+## 1. Message from the previous AI assistant
+
+Hello, next AI assistant.
+
+I am the AI assistant handing this repository over to you. I reviewed the current `main` branch of **AlfaCode** and inspected its README, main HTML entry point, editor-engine/controller modules, preview and visual-editing modules, UI layout modules, and part of the locally bundled Monaco distribution.
+
+My job in this handoff is to preserve the distinction between:
+- defects directly visible in the inspected source;
+- architectural risks that deserve testing;
+- features claimed by documentation but not yet verified in a real browser;
+- suggestions for future improvement.
+
+Do not turn an untested suspicion into a claimed bug. Do not rewrite working systems merely to make the code look different. First reproduce, record, and isolate each issue; then make the smallest safe change and test it.
+
+The repository owner expects practical work, not long speculative discussions. When a task is clear, implement it directly, keep changes focused, and report exactly what changed and what was actually tested.
+
+## 2. Repository identity and non-negotiable project rules
+
+- Repository: https://github.com/alfamaniya/AlfaCode
+- Default branch observed during review: `main`
+- Repository is public.
+- The project is a browser-based HTML/CSS/JavaScript playground/editor.
+- The interface is built with plain HTML, CSS, and JavaScript.
+- The project contains local distributions of Monaco Editor and CodeMirror 6.
+- The intended runtime does not require npm installation, a bundler, a CDN, or an internet connection.
+- A local HTTP server is recommended because browser restrictions can affect local assets and Monaco workers when opening the page using `file://`.
+
+### Mandatory offline requirement
+
+**The application must work without internet access.** Do not add runtime dependencies on:
+- CDNs;
+- remote JavaScript or CSS;
+- external fonts, icon packs, or images;
+- remote APIs or services;
+- network-hosted workers or dynamically fetched libraries.
+
+Any new required dependency must be included locally in the repository, with its license notices and correct local loading paths. A local development HTTP server is allowed; an internet connection is not a runtime requirement.
+
+### UI language
+
+The README states that all application UI text must be English. Keep buttons, labels, menus, messages, tooltips, settings, and other visible application copy in English, even when the owner gives instructions in another language.
+
+### Preserve the current product direction
+
+Do not replace Monaco or CodeMirror, remove features, change the preview architecture, or redesign the UI without a specific reason and a reproducible problem. Keep the preview's default page background white unless the owner explicitly requests otherwise.
+
+## 3. Architecture observed
+
+The repository documentation and inspected files indicate this general structure:
+
+- `index.html`: application shell, controls, panels, preview iframe, SVG symbols, and stylesheet entry point.
+- `style.css` and `css/`: theme, shell, editor, components, responsive behavior, visual fullscreen layout, and theme settings.
+- `js/ui/layout.js`: panel layout, sidebars, resizing, and tabs.
+- `js/ui/settings-state.js`: persisted UI/editor/preview/layout settings.
+- `js/ui/theme-settings.js`: settings UI and theme controls.
+- `js/editor/defaults.js`: default sample content.
+- `js/editor/engines.js`: Monaco and CodeMirror engine integration.
+- `js/editor/controller.js`: editor state, event coordination, persistence, import/export, and preview updates.
+- `js/editor/html-import.js`: parsing/import of complete HTML documents and extraction of inline CSS/JS.
+- `js/editor/preview-document.js`: preview document generation and visual-selection script.
+- `js/editor/visual-inspector.js`: visual selection and inspector interactions.
+- `js/editor/visual-fullscreen.js`: visual-mode fullscreen controls.
+- `js/visual/visual-catalog.js` and `js/visual/visual-properties.js`: visual property groups, options, and property controls.
+- `editors/monaco/`: locally bundled Monaco distribution.
+- `editors/codemirror6/`: locally bundled CodeMirror 6 distribution and build/licensing documentation.
+
+The README describes three code tabs (HTML, CSS, JavaScript), two editor engines, a sandboxed live preview, localStorage persistence, HTML import, export/download, search, undo/redo, visual editing, settings, and adjustable layout. These are documented capabilities, not all independently verified in this review.
+
+## 4. Findings directly observed in source/documentation
+
+The following are concrete observations from the inspected revision. Some are documentation/quality issues rather than runtime-breaking defects.
+
+### 4.1 README begins with a bare URL
+
+At the very beginning of `README.md`, before the project heading, there is a raw URL:
+
+```text
+https://github.com/alfamaniya/AlfaCode/blob/main/visual%20mode.md
+```
+
+It is not formatted as a Markdown link and has no explanation. This makes the README opening look accidental and does not tell readers what the linked document is.
+
+**Required action:** Convert it into a descriptive Markdown link in an appropriate section, or remove it if the document is obsolete. Do not delete the referenced document without checking whether it contains current requirements.
+
+### 4.2 README directory tree is incomplete/inconsistent
+
+The README tree lists the `js/ui/` and `js/editor/` directories but does not include the `js/visual/` directory, even though later README sections explicitly refer to:
+- `js/visual/visual-properties.js`
+- `js/visual/visual-catalog.js`
+
+The README therefore gives an incomplete view of the actual source layout.
+
+**Required action:** Update the tree to include the visual directory and its files. Verify every listed path against the actual repository before documenting it. Do not invent files or directories.
+
+### 4.3 Generic browser document title
+
+The inspected `index.html` contains:
+
+```html
+<title>Alfa-Code Layout</title>
+```
+
+This appears to be a development/layout-oriented title rather than a finished product title. It may be visible in the browser tab and bookmarks.
+
+**Required action:** Consider changing it to a consistent product title such as `AlfaCode`, unless the current wording is intentional. Check README, app branding, and browser title for consistency.
+
+### 4.4 README describes behavior more comprehensively than has been verified
+
+The README makes detailed claims about:
+- Monaco and CodeMirror parity;
+- autocomplete and language services;
+- live preview behavior;
+- HTML import and extraction;
+- visual editing and CSS property groups;
+- fullscreen visual mode;
+- settings persistence and factory reset;
+- keyboard shortcuts;
+- responsive layout;
+- offline operation.
+
+A static source review cannot prove that these flows all work correctly. This is a verification/documentation gap, not proof that the features are broken.
+
+**Required action:** Build a repeatable browser test checklist. Keep README claims only when the corresponding behavior has been exercised successfully. If a feature is incomplete, describe its actual status accurately rather than silently removing it.
+
+### 4.5 Monaco distribution contains a version/provenance question
+
+The inspected Monaco AMD loader at `editors/monaco/vs/loader.js` has a header identifying it as `0.42.0-dev-20230906`. The previously inspected `editor.main.js` bundle appeared to contain a newer/different build signature. This is a potential distribution consistency issue, but the loader can be independently versioned and the observation alone does **not** establish incompatibility.
+
+**Required action:**
+1. Identify the exact Monaco release/build represented by the editor bundle.
+2. Check the provenance/version of the loader, editor entry point, CSS, workers, language contributions, and supporting assets.
+3. Confirm that all required files come from a compatible Monaco distribution.
+4. Run the editor and worker tests listed below.
+5. If the files are intentionally mixed and demonstrably compatible, document that fact. Otherwise replace the distribution as a coherent, locally bundled set.
+
+Do not replace the loader merely because its version string differs.
+
+### 4.6 Verify README paths and actual script/style loading order
+
+The README says scripts and styles are loaded locally in a deliberate order and that no dynamic module loader or bundler is required. This is an important design constraint. A wrong path or load order can leave the shell visible while editor functionality silently fails.
+
+**Required action:** Audit every `<script>` and `<link>` reference in `index.html` against the actual tracked paths. Check dependency order, duplicate inclusion, missing files, and console/network errors with the app served from the repository root.
+
+### 4.7 Preview background requirement
+
+The inspected application entry point/styles establish a white preview surface (the preview document's default background is intended to be `#ffffff`). Preserve this behavior. The application chrome may use its own theme; the user's authored preview should not inherit the editor's dark theme accidentally.
+
+**Required action:** Test an empty preview, a page without a body background, and an imported HTML document. Verify that the preview's default canvas remains white while authored CSS backgrounds still work.
+
+## 5. Important risks requiring runtime verification (not confirmed defects)
+
+These areas deserve focused tests. The source inspection did not establish that each one is broken.
+
+### 5.1 Monaco engine
+
+Verify all of the following in a real browser:
+- Monaco loads from local files with network access disabled.
+- The editor appears after initial page load and after switching from CodeMirror.
+- HTML, CSS, and JavaScript models use the intended language IDs.
+- Syntax highlighting works for all three tabs.
+- Completion/autocomplete works for HTML, CSS, and JavaScript.
+- Suggestions include relevant language features and do not depend on a remote service.
+- Diagnostics/markers appear where expected.
+- Find/search, undo, redo, selection, copy/paste, and keyboard shortcuts work.
+- Minimap behavior matches settings (if exposed).
+- Font size and other editor settings apply immediately and persist after reload.
+- Layout/resize events correctly call Monaco layout logic; no clipped editor or zero-sized editor appears after panel changes.
+- Switching tabs preserves each tab's own text, cursor/selection where intended, and undo history where supported.
+- Switching engines repeatedly does not duplicate listeners, models, workers, or DOM nodes.
+- Monaco workers load from local URLs and produce no 404, MIME-type, CSP, or cross-origin errors.
+- Worker language features continue to work after switching tabs and resizing panels.
+
+### 5.2 CodeMirror 6 engine
+
+Verify:
+- CodeMirror loads independently from its local bundle.
+- HTML, CSS, and JavaScript language support is correctly configured.
+- Syntax highlighting, indentation, brackets, selection, search, undo/redo, and keyboard behavior work.
+- Its content remains synchronized with the application's canonical tab state.
+- Switching between CodeMirror and Monaco never loses or overwrites edits.
+- Settings such as font size and theme are applied consistently where supported.
+- Resizing and switching tabs do not leave stale editor instances.
+- No runtime network request is made for an extension, language package, or stylesheet.
+
+### 5.3 Engine switching and shared state
+
+The inspected controller includes an `alfa-code:setting-change` event handler that reacts to `editorEngine` changes by calling `switchToEngine(event.detail.value, false)`. This is evidence that settings-driven engine switching is wired, but it does not prove every switching path is correct.
+
+Test:
+- switching through settings;
+- switching through any direct engine selector, if present;
+- switching while a tab contains unsaved edits;
+- switching during or immediately after a preview update;
+- switching repeatedly between both engines;
+- restoring the chosen engine after reload;
+- invalid or unavailable engine values;
+- error recovery if one engine fails to initialize.
+
+There must be one clear source of truth for each tab's text. Neither editor should silently become the only copy of the content.
+
+### 5.4 Preview iframe and execution lifecycle
+
+The README describes an isolated iframe with sandbox. The inspected sandbox permissions included scripts, modals, forms, and popups, without `allow-same-origin`. That configuration provides useful isolation, but the actual behavior still needs testing.
+
+Test:
+- initial blank preview;
+- automatic preview update after editing each tab;
+- manual/automatic preview settings;
+- valid and invalid HTML/CSS/JS;
+- JavaScript errors inside the preview;
+- console errors versus errors in the parent application;
+- form behavior and popup behavior where intended;
+- reload and preview-in-new-window behavior;
+- iframe recreation and event-listener cleanup;
+- messages between parent and iframe;
+- correct handling of the opaque sandbox origin (do not assume the iframe has the parent origin);
+- malicious or malformed user-authored markup does not gain unintended access to parent application state;
+- white default canvas and authored page backgrounds.
+
+Do not weaken iframe sandbox permissions to make a failing feature work without understanding the security consequences.
+
+### 5.5 Visual editor / inspector
+
+This is a complex feature and should be tested as a full workflow rather than by checking whether the panel renders.
+
+Test:
+- entering visual mode and exiting it;
+- exiting fullscreen without accidentally disabling visual mode, and disabling visual mode fully;
+- Escape-key behavior;
+- selecting elements in the preview;
+- hover outline/tooltip and selected-element identity;
+- nested elements, text nodes, SVG elements, pseudo-elements, and elements with no ID/class;
+- selecting elements after preview refresh;
+- selection when the target element is dynamically created;
+- switching between HTML/CSS/JS while visual mode is active;
+- CSS property groups and all controls;
+- numeric values, units, colors, keywords, and arbitrary custom values;
+- empty values and invalid CSS values;
+- repeated edits to the same property;
+- properties with shorthand/longhand interactions;
+- preserving existing author CSS and not destroying unrelated rules;
+- removing/resetting a managed property;
+- handling duplicate selectors and multiple matching elements;
+- persistence of visual edits in the CSS tab;
+- responsive behavior at narrow and wide viewport sizes.
+
+A critical acceptance criterion: visual editing must not silently delete or rewrite unrelated CSS authored by the user.
+
+### 5.6 HTML import and paste parsing
+
+The README claims that importing or pasting a complete HTML document extracts inline `<style>` and `<script>` contents into their corresponding tabs.
+
+Test:
+- complete valid HTML documents;
+- documents with multiple style/script tags;
+- attributes on script/style tags;
+- scripts with `type="module"` and non-JavaScript script types;
+- comments containing apparent style/script tags;
+- CSS or JS strings containing HTML-like text;
+- malformed/incomplete documents;
+- external stylesheet/script references;
+- empty style/script tags;
+- preserving doctype, head metadata, body markup, and document structure;
+- drag-and-drop and file-picker import;
+- unsupported file types and read failures;
+- importing a document after existing user edits (confirm the intended replace/merge behavior).
+
+Do not use fragile regular expressions as a substitute for HTML parsing if they corrupt valid documents. Preserve semantics and clearly define which external references remain in the imported HTML.
+
+### 5.7 localStorage and data lifecycle
+
+Test:
+- saving all three code tabs;
+- restoring them after reload;
+- saving/restoring selected engine and supported settings;
+- handling missing, malformed, stale, or quota-exceeding stored data;
+- private browsing or storage-disabled environments;
+- factory reset versus clear-all-tabs semantics;
+- settings export/import and invalid import data;
+- ensuring reset operations do not accidentally erase unrelated preferences or data;
+- versioning/migration if the stored schema changes.
+
+Avoid unguarded storage operations that can crash application startup when localStorage is unavailable.
+
+### 5.8 Layout, responsive behavior, and settings
+
+Test:
+- resizing editor and preview panes;
+- collapsing/expanding sidebars;
+- drag handles and minimum panel sizes;
+- tab changes and settings navigation;
+- restoring layout after reload;
+- fullscreen and visual fullscreen transitions;
+- narrow desktop windows and mobile-sized viewports;
+- keyboard accessibility and visible focus;
+- controls that appear enabled but have no event handler;
+- settings values reflected in the actual UI and persisted state.
+
+Check for layout races where an editor is initialized while its container is hidden or has zero dimensions.
+
+### 5.9 Offline behavior and asset integrity
+
+With the browser network disabled:
+- load the app from a local HTTP server;
+- confirm all scripts, styles, fonts, icons, workers, and language resources load;
+- inspect the Network panel for attempted external requests;
+- confirm no feature requires a remote endpoint;
+- check for missing local files and incorrect MIME types;
+- confirm all licenses/notices for bundled dependencies remain present.
+
+A page that renders its shell offline but fails to initialize the editor is not offline-compatible.
+
+## 6. Prioritized remediation plan
+
+Use this order. Do not start with cosmetic refactoring.
+
+### P0 — Establish a reproducible baseline
+1. Record the current `main` commit SHA before edits.
+2. Serve the project from its root using a local HTTP server.
+3. Capture browser console errors and failed network requests.
+4. Test startup with internet disabled.
+5. Confirm both editor engines initialize.
+6. Confirm the preview renders and remains white by default.
+7. Record actual failures with exact reproduction steps.
+
+### P1 — Fix confirmed documentation/consistency issues
+1. Fix the unexplained raw URL at the top of README.
+2. Add the missing `js/visual/` section to the README tree.
+3. Verify every README path and command.
+4. Decide whether the browser title should be `AlfaCode` and make branding consistent.
+5. Document the actual Monaco bundle/loader versions and provenance.
+
+### P2 — Stabilize editor engines
+1. Test Monaco independently.
+2. Test CodeMirror independently.
+3. Test state preservation during repeated engine switches.
+4. Test worker loading and all local paths.
+5. Fix only reproduced issues, with focused changes.
+
+### P3 — Stabilize preview and import
+1. Verify iframe isolation and parent/child messaging.
+2. Verify automatic/manual preview updates.
+3. Test import and paste against realistic HTML samples.
+4. Verify localStorage failure handling and data recovery.
+
+### P4 — Stabilize visual editing
+1. Test element selection and hover feedback.
+2. Audit every property group/control.
+3. Verify CSS serialization and preservation of unrelated rules.
+4. Test fullscreen/exit behavior and responsive layouts.
+
+### P5 — Release readiness
+1. Add a repeatable manual QA checklist or automated tests where practical.
+2. Check keyboard accessibility and responsive behavior.
+3. Validate all bundled license notices.
+4. Update README to reflect tested behavior only.
+5. Run the complete offline regression checklist before declaring the project complete.
+
+## 7. Rules for the next AI assistant / Copilot
+
+1. **Read this file and README before editing.**
+2. Work only in `alfamaniya/AlfaCode`; do not confuse it with another repository named AlfaCode.
+3. Treat the current repository contents as the source of truth. Do not import assumptions from unrelated projects.
+4. Inspect the exact current file before modifying it. Do not rely on stale snippets or old chat summaries.
+5. Do not overwrite user work or unrelated changes.
+6. Keep each change narrowly scoped and explain why it is needed.
+7. Do not add internet dependencies.
+8. Do not remove bundled editor files, language services, workers, or licenses without proving they are unused and checking all references.
+9. Do not claim a feature works merely because a function or event listener exists.
+10. Do not claim a bug is fixed without reproducing it before the change and verifying it afterward.
+11. After JavaScript changes, check syntax and the browser console. After CSS/layout changes, inspect the actual rendered page at relevant viewport sizes.
+12. After editor changes, test both Monaco and CodeMirror, not just the currently selected engine.
+13. After preview/visual-editor changes, test the iframe boundary and preservation of user-authored content.
+14. Keep application UI copy in English.
+15. Preserve the white preview default.
+16. Avoid broad formatting, renaming, file moves, or architecture rewrites unless explicitly requested.
+17. Before committing, inspect the diff and confirm that only intended files changed.
+18. Report: files changed, behavior changed, tests run, tests not run, and any remaining risks. Be honest about limitations.
+
+## 8. Review limitations and confidence
+
+This handoff is based on a static inspection of selected files in the repository's `main` branch. It is **not** a full browser QA report, security audit, accessibility audit, performance audit, or exhaustive line-by-line review of every file.
+
+In particular:
+- no claim is made that every documented feature was executed in a browser;
+- no claim is made that every possible Monaco/CodeMirror language feature works;
+- no confirmed incompatibility is inferred solely from the loader's version header;
+- no security guarantee is inferred solely from the iframe sandbox attribute;
+- the risk sections above are test requirements, not a list of proven defects.
+
+The concrete source/documentation findings are listed in section 4. Everything in section 5 must be verified before being classified as a defect.
+
+## 9. Definition of done
+
+A change is complete only when:
+- the requested behavior is implemented;
+- no unrelated behavior or user data is broken;
+- the app starts from a local HTTP server;
+- the relevant feature works with internet disabled;
+- both editor engines remain functional where the change affects shared editor behavior;
+- the preview remains isolated and has the expected white default background;
+- the browser console has no new relevant errors;
+- the Git diff contains only intended changes;
+- documentation matches the implemented and tested behavior.
+
+---
+
+**Handoff ends here.** Continue from the current repository state, verify before assuming, and prefer small tested fixes over speculative rewrites.
