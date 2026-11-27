@@ -101,7 +101,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>
         <span class="btn-label">Editor: <span id="editorName">Monaco</span></span>
       </button>
-      <button class="btn btn--header" id="themeSettingsToggle" type="button" aria-label="Interface color settings" title="Interface color settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="themeSettingsPanel">
+      <button class="btn btn--header" id="themeSettingsToggle" type="button" aria-label="Open settings" title="Settings" aria-pressed="false" aria-controls="themeSettingsPanel">
         <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="btn-label">Settings</span>
       </button>
       <button class="btn btn--header btn--header-end" type="button" aria-label="Help" title="Help">
@@ -111,50 +111,6 @@
   </header>
 
   <input type="file" id="importFile" class="visually-hidden" accept=".html,.htm,text/html" />
-
-  <section class="theme-settings" id="themeSettingsPanel" role="dialog" aria-labelledby="themeSettingsTitle" aria-describedby="themeSettingsDescription" hidden>
-    <div class="theme-settings__header">
-      <div>
-        <h2 id="themeSettingsTitle">Interface colors</h2>
-        <p id="themeSettingsDescription">Choose a color group for the AlfaCode interface.</p>
-      </div>
-      <button class="theme-settings__close" id="themeSettingsClose" type="button" aria-label="Close color settings">
-        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
-      </button>
-    </div>
-    <div class="theme-options" id="themeOptions" role="radiogroup" aria-label="Interface color groups">
-      <button class="theme-option" type="button" role="radio" aria-checked="true" data-theme-option="ocean" style="--theme-swatch:#45d8e8;--theme-surface:#0a2830;--theme-base:#04141a">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Ocean</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-      <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="forest" style="--theme-swatch:#4ade80;--theme-surface:#122a20;--theme-base:#07130f">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Forest</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-      <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="violet" style="--theme-swatch:#c4a1ff;--theme-surface:#251d35;--theme-base:#100c19">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Violet</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-      <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="amber" style="--theme-swatch:#ffc266;--theme-surface:#332516;--theme-base:#171007">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Amber</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-      <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="rose" style="--theme-swatch:#ff8da1;--theme-surface:#331c25;--theme-base:#170b10">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Rose</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-      <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="light" style="--theme-swatch:#2878c8;--theme-surface:#f6f8fb;--theme-base:#e1e8f0">
-        <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="theme-option__name">Light</span>
-        <span class="theme-option__check" aria-hidden="true">✓</span>
-      </button>
-    </div>
-  </section>
 
   <aside class="sidebar sidebar--left" id="sidebarLeft" aria-label="Left sidebar" tabindex="-1" aria-hidden="false">
     <div class="sidebar-head">
@@ -318,6 +274,87 @@
         </div>
       </section>
     </div>
+    <section class="theme-settings" id="themeSettingsPanel" aria-labelledby="themeSettingsTitle" hidden>
+      <header class="theme-settings__header">
+        <div>
+          <p class="theme-settings__eyebrow">ALFACODE PREFERENCES</p>
+          <h1 id="themeSettingsTitle">Settings</h1>
+          <p id="themeSettingsDescription">Customize the editor workspace and interface.</p>
+        </div>
+        <button class="theme-settings__close" id="themeSettingsClose" type="button" aria-label="Return to editor">
+          <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg><span>Back to editor</span>
+        </button>
+      </header>
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="Settings categories">
+          <p class="settings-nav__label">CATEGORIES</p>
+          <button class="settings-nav__item is-active" type="button" aria-current="page">
+            <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Colors</span>
+          </button>
+          <button class="settings-nav__item" type="button" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg><span>Editor</span><span class="settings-nav__soon">Soon</span>
+          </button>
+          <button class="settings-nav__item" type="button" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-view-preview"/></svg><span>Preview</span><span class="settings-nav__soon">Soon</span>
+          </button>
+          <button class="settings-nav__item" type="button" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg><span>Shortcuts</span><span class="settings-nav__soon">Soon</span>
+          </button>
+        </nav>
+        <div class="settings-content">
+          <section class="settings-card" aria-labelledby="themeSettingsColorsTitle">
+            <div class="settings-card__heading">
+              <div>
+                <h2 id="themeSettingsColorsTitle">Interface colors</h2>
+                <p>Choose a preset palette or set your own accent color.</p>
+              </div>
+              <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>
+            </div>
+            <h3 class="settings-section-title">Preset palettes</h3>
+            <div class="theme-options" id="themeOptions" role="radiogroup" aria-label="Interface color presets">
+              <button class="theme-option" type="button" role="radio" aria-checked="true" data-theme-option="ocean" style="--theme-swatch:#45d8e8;--theme-surface:#0a2830;--theme-base:#04141a">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Ocean</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="forest" style="--theme-swatch:#4ade80;--theme-surface:#122a20;--theme-base:#07130f">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Forest</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="violet" style="--theme-swatch:#c4a1ff;--theme-surface:#251d35;--theme-base:#100c19">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Violet</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="amber" style="--theme-swatch:#ffc266;--theme-surface:#332516;--theme-base:#171007">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Amber</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="rose" style="--theme-swatch:#ff8da1;--theme-surface:#331c25;--theme-base:#170b10">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Rose</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="light" style="--theme-swatch:#2878c8;--theme-surface:#f6f8fb;--theme-base:#e1e8f0">
+                <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option__name">Light</span><span class="theme-option__check" aria-hidden="true">✓</span>
+              </button>
+            </div>
+            <h3 class="settings-section-title settings-section-title--custom">Custom accent</h3>
+            <div class="custom-color-control">
+              <div class="custom-color-control__copy">
+                <strong>Choose your interface color</strong>
+                <span>Updates accents, highlights, and editor selection colors.</span>
+              </div>
+              <label class="custom-color-picker">
+                <span class="visually-hidden">Custom interface accent color</span>
+                <input id="customThemeColor" type="color" value="#45d8e8" aria-label="Custom interface accent color">
+              </label>
+              <output class="custom-color-value" id="customThemeColorValue" for="customThemeColor">#45D8E8</output>
+              <button class="custom-color-reset" id="customThemeColorReset" type="button">Reset to palette</button>
+            </div>
+          </section>
+          <p class="settings-note">Your color preferences are saved in this browser and do not affect the project preview.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">

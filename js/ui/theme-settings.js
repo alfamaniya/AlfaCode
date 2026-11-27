@@ -5,8 +5,13 @@
   var trigger = document.getElementById("themeSettingsToggle");
   var panel = document.getElementById("themeSettingsPanel");
   var closeButton = document.getElementById("themeSettingsClose");
+  var main = document.getElementById("main");
+  var split = document.getElementById("split");
+  var customColor = document.getElementById("customThemeColor");
+  var customColorValue = document.getElementById("customThemeColorValue");
+  var customColorReset = document.getElementById("customThemeColorReset");
   var options = Array.prototype.slice.call(document.querySelectorAll("[data-theme-option]"));
-  if (!trigger || !panel || !closeButton || !options.length) return;
+  if (!trigger || !panel || !closeButton || !main || !split || !customColor || !customColorValue || !customColorReset || !options.length) return;
 
   var themes = {
     ocean: {
@@ -120,6 +125,7 @@
   };
 
   var activeTheme = "ocean";
+  var customAccentKey = "alfa-code:custom-accent";
   var tintLevels = {
     "--c-tint-02": 0.03,
     "--c-tint-05": 0.06,
@@ -146,10 +152,32 @@
     }
   }
 
+  function loadCustomAccent() {
+    try {
+      var accent = localStorage.getItem(customAccentKey);
+      return isValidAccent(accent) ? accent : null;
+    } catch (error) {
+      console.warn("[Alfa-Code] Could not read the saved custom color:", error);
+      return null;
+    }
+  }
+
+  function saveCustomAccent(accent) {
+    try {
+      if (accent) localStorage.setItem(customAccentKey, accent);
+      else localStorage.removeItem(customAccentKey);
+    } catch (error) {
+      console.warn("[Alfa-Code] Could not save the custom color:", error);
+    }
+  }
+
+  function isValidAccent(hex) {
+    return typeof hex === "string" && /^#[0-9a-f]{6}$/i.test(hex);
+  }
+
   function accentChannels(hex) {
-    var match = /^#([0-9a-f]{6})$/i.exec(hex);
-    if (!match) throw new Error("Invalid accent color in theme configuration.");
-    var value = match[1];
+    if (!isValidAccent(hex)) throw new Error("Invalid accent color in theme configuration.");
+    var value = hex.slice(1);
     return [
       parseInt(value.slice(0, 2), 16),
       parseInt(value.slice(2, 4), 16),
@@ -157,20 +185,13 @@
     ];
   }
 
-  function applyTheme(themeName) {
+  function applyTheme(themeName, clearCustomAccent) {
     var theme = themes[themeName];
     if (!theme) return;
     root.setAttribute("data-color-theme", themeName);
     Object.keys(theme).forEach(function (property) {
       root.style.setProperty(property, theme[property]);
     });
-
-    var channels = accentChannels(theme["--c-turquoise"]);
-    Object.keys(tintLevels).forEach(function (property) {
-      root.style.setProperty(property, "rgba(" + channels.join(", ") + ", " + tintLevels[property] + ")");
-    });
-    root.style.setProperty("--c-glow", "rgba(" + channels.join(", ") + ", .42)");
-    root.style.setProperty("--c-glow-soft", "rgba(" + channels.join(", ") + ", .18)");
 
     activeTheme = themeName;
     options.forEach(function (option) {
@@ -179,40 +200,80 @@
       option.tabIndex = selected ? 0 : -1;
     });
     saveTheme(themeName);
+    if (clearCustomAccent) saveCustomAccent(null);
+    applyAccent(theme["--c-turquoise"], false);
+  }
+
+  function applyAccent(accent, persist) {
+    if (!isValidAccent(accent)) return;
+    var channels = accentChannels(accent);
+    var softChannels = channels.map(function (channel) {
+      return Math.round(channel * 0.78);
+    });
+    root.style.setProperty("--c-turquoise", accent);
+    root.style.setProperty("--c-turquoise-soft", "#" + softChannels.map(function (channel) {
+      return channel.toString(16).padStart(2, "0");
+    }).join(""));
+    Object.keys(tintLevels).forEach(function (property) {
+      root.style.setProperty(property, "rgba(" + channels.join(", ") + ", " + tintLevels[property] + ")");
+    });
+    root.style.setProperty("--c-glow", "rgba(" + channels.join(", ") + ", .42)");
+    root.style.setProperty("--c-glow-soft", "rgba(" + channels.join(", ") + ", .18)");
+    customColor.value = accent;
+    customColorValue.value = accent.toUpperCase();
+    customColorValue.textContent = accent.toUpperCase();
+    var activeOption = options.filter(function (option) {
+      return option.getAttribute("data-theme-option") === activeTheme;
+    })[0];
+    if (activeOption) activeOption.style.setProperty("--theme-swatch", accent);
+    if (persist) saveCustomAccent(accent);
     window.dispatchEvent(new CustomEvent("alfa-code:theme-change", {
-      detail: { theme: themeName }
+      detail: { theme: activeTheme, accent: accent }
     }));
   }
 
-  function setOpen(open, returnFocus) {
+  function setSettingsOpen(open, returnFocus) {
     panel.hidden = !open;
-    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    main.classList.toggle("settings-open", open);
+    trigger.setAttribute("aria-pressed", open ? "true" : "false");
+    trigger.setAttribute("aria-label", open ? "Return to editor" : "Open settings");
+    trigger.title = open ? "Return to editor" : "Settings";
+    var label = trigger.querySelector(".btn-label");
+    if (label) label.textContent = open ? "Editor" : "Settings";
     if (open) {
+      split.setAttribute("aria-hidden", "true");
       var selected = options.filter(function (option) {
         return option.getAttribute("data-theme-option") === activeTheme;
       })[0];
       if (selected) selected.focus();
-    } else if (returnFocus) {
-      trigger.focus();
+    } else {
+      split.removeAttribute("aria-hidden");
+      if (returnFocus) trigger.focus();
     }
   }
 
   trigger.addEventListener("click", function () {
-    setOpen(panel.hidden, false);
+    setSettingsOpen(panel.hidden, false);
   });
   closeButton.addEventListener("click", function () {
-    setOpen(false, true);
+    setSettingsOpen(false, true);
   });
   options.forEach(function (option) {
     option.addEventListener("click", function () {
-      applyTheme(option.getAttribute("data-theme-option"));
+      applyTheme(option.getAttribute("data-theme-option"), true);
     });
+  });
+  customColor.addEventListener("input", function () {
+    applyAccent(customColor.value, true);
+  });
+  customColorReset.addEventListener("click", function () {
+    applyTheme(activeTheme, true);
   });
 
   panel.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
       event.preventDefault();
-      setOpen(false, true);
+      setSettingsOpen(false, true);
       return;
     }
 
@@ -229,10 +290,15 @@
     }
   });
 
-  document.addEventListener("pointerdown", function (event) {
-    if (panel.hidden || panel.contains(event.target) || trigger.contains(event.target)) return;
-    setOpen(false, false);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !panel.hidden) {
+      event.preventDefault();
+      setSettingsOpen(false, true);
+    }
   });
 
-  applyTheme(loadTheme());
+  activeTheme = loadTheme();
+  var savedAccent = loadCustomAccent();
+  applyTheme(activeTheme, false);
+  if (savedAccent) applyAccent(savedAccent, false);
 })();
