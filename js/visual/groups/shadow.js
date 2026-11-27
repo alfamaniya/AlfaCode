@@ -1,0 +1,1 @@
+(function(){'use strict';var P=window.AlfaCodeVisualProperties,Pf=P.field,Ps=P.section;P.register('shadow',{sections:[Ps('Box shadow',[Pf('Box shadow','box-shadow','text'),Pf('Shadow color','color','color')]),Ps('Text shadow',[Pf('Text shadow','text-shadow','text')])]});})();

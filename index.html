@@ -174,10 +174,16 @@
         <button class="visual-group" type="button" data-visual-group="forms" aria-label="Form Controls" data-tooltip="Form Controls"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="visual-group-label" aria-hidden="true">Form Controls</span></button>
         <button class="visual-group" type="button" data-visual-group="containment" aria-label="Containment &amp; Container Queries" data-tooltip="Containment &amp; Container Queries"><svg class="icon" aria-hidden="true"><use href="#i-box"/></svg><span class="visual-group-label" aria-hidden="true">Containment &amp; Container Queries</span></button>
         <button class="visual-group" type="button" data-visual-group="custom-properties" aria-label="Custom Properties" data-tooltip="Custom Properties"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg><span class="visual-group-label" aria-hidden="true">Custom Properties</span></button>
+        <button class="visual-group" type="button" data-visual-group="responsive" aria-label="Responsive &amp; Object Fit" data-tooltip="Responsive &amp; Object Fit"><svg class="icon" aria-hidden="true"><use href="#i-maximize-2"/></svg><span class="visual-group-label" aria-hidden="true">Responsive</span></button>
+        <button class="visual-group" type="button" data-visual-group="svg" aria-label="SVG Paint &amp; Stroke" data-tooltip="SVG Paint &amp; Stroke"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg><span class="visual-group-label" aria-hidden="true">SVG</span></button>
+        <button class="visual-group" type="button" data-visual-group="logical" aria-label="Logical Properties" data-tooltip="Logical Properties"><svg class="icon" aria-hidden="true"><use href="#i-workflow"/></svg><span class="visual-group-label" aria-hidden="true">Logical</span></button>
+        <button class="visual-group" type="button" data-visual-group="accessibility" aria-label="Accessibility &amp; Motion" data-tooltip="Accessibility &amp; Motion"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="visual-group-label" aria-hidden="true">Accessibility</span></button>
+        <button class="visual-group" type="button" data-visual-group="view-transitions" aria-label="View Transitions" data-tooltip="View Transitions"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg><span class="visual-group-label" aria-hidden="true">View Transitions</span></button>
       </div>
       <section class="visual-group-detail" id="visualGroupDetail" hidden aria-live="polite">
         <button class="visual-group-back" id="visualGroupBack" type="button">All groups</button>
-        <h3 id="visualGroupTitle"></h3>
+        <h3 id="visualGroupTitle" data-visual-detail-title></h3>
+        <div class="visual-property-controls" data-visual-detail-controls></div>
       </section>
     </div>
     <ul class="sidebar-nav">
@@ -424,6 +430,39 @@
   <script src="js/editor/preview-document.js"></script>
   <script src="js/ui/settings-state.js"></script>
   <script src="js/editor/engines.js"></script>
+  <script src="js/visual/visual-properties.js"></script>
+  <script src="js/visual/groups/layout.js"></script>
+  <script src="js/visual/groups/positioning.js"></script>
+  <script src="js/visual/groups/flexbox.js"></script>
+  <script src="js/visual/groups/grid.js"></script>
+  <script src="js/visual/groups/columns.js"></script>
+  <script src="js/visual/groups/sizing.js"></script>
+  <script src="js/visual/groups/spacing.js"></script>
+  <script src="js/visual/groups/typography.js"></script>
+  <script src="js/visual/groups/text.js"></script>
+  <script src="js/visual/groups/color-background.js"></script>
+  <script src="js/visual/groups/border-outline.js"></script>
+  <script src="js/visual/groups/shadow.js"></script>
+  <script src="js/visual/groups/effects.js"></script>
+  <script src="js/visual/groups/masking.js"></script>
+  <script src="js/visual/groups/transform.js"></script>
+  <script src="js/visual/groups/overflow.js"></script>
+  <script src="js/visual/groups/scroll-snap.js"></script>
+  <script src="js/visual/groups/visibility.js"></script>
+  <script src="js/visual/groups/interaction.js"></script>
+  <script src="js/visual/groups/transition.js"></script>
+  <script src="js/visual/groups/list.js"></script>
+  <script src="js/visual/groups/table.js"></script>
+  <script src="js/visual/groups/content.js"></script>
+  <script src="js/visual/groups/states.js"></script>
+  <script src="js/visual/groups/forms.js"></script>
+  <script src="js/visual/groups/containment.js"></script>
+  <script src="js/visual/groups/custom-properties.js"></script>
+  <script src="js/visual/groups/responsive.js"></script>
+  <script src="js/visual/groups/svg.js"></script>
+  <script src="js/visual/groups/logical.js"></script>
+  <script src="js/visual/groups/accessibility.js"></script>
+  <script src="js/visual/groups/view-transitions.js"></script>
   <script src="js/editor/visual-inspector.js"></script>
   <script src="js/ui/layout.js"></script>
   <script src="js/editor/visual-fullscreen.js"></script>

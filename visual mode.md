@@ -2,7 +2,7 @@
 
 این سند ساختار گروه‌های موجود در منوی حالت ویژوال و زیرگروه‌ها و تنظیمات اصلی پیشنهادی برای هر گروه را مشخص می‌کند. نام گروه‌ها و شناسه‌های `data-visual-group` با دکمه‌های تعریف‌شده در `index.html` هماهنگ هستند.
 
-> **وضعیت فعلی:** دکمه‌های ۲۷ گروه در رابط کاربری وجود دارند؛ انتخاب هر گروه در حال حاضر فقط عنوان آن را در پنل جزئیات نمایش می‌دهد. زیرگروه‌ها و کنترل‌های زیر، نقشهٔ ساختاری برای تکمیل پنل ویژوال هستند و هنوز به‌عنوان کنترل‌های قابل‌استفاده پیاده‌سازی نشده‌اند.
+> **وضعیت فعلی:** ۳۲ گروه در رابط کاربری ثبت شده‌اند؛ هر گروه مجموعهٔ زیرگروه‌ها و کنترل‌های مستقل خود را دارد. تغییر تنظیمات معتبر روی المان انتخاب‌شده به‌صورت زنده اعمال می‌شود و در بلاک مدیریت‌شدهٔ CSS پروژه ثبت می‌شود.
 
 ```text
 حالت ویژوال
@@ -108,10 +108,27 @@
 │   ├── مهار: contain، contain-intrinsic-size
 │   ├── تعریف محفظه: container-name، container-type
 │   └── پرس‌وجوی محفظه: @container و شرط‌های اندازه
-└── Custom Properties [custom-properties]
-    ├── متغیرهای CSS: --name و var()
-    ├── مقدار جایگزین و ارث‌بری: var(--name, fallback)، inherit
-    └── ثبت نوع متغیر: @property، syntax، inherits، initial-value
+├── Custom Properties [custom-properties]
+│   ├── متغیرهای CSS: --name و var()
+│   ├── مقدار جایگزین و ارث‌بری: var(--name, fallback)، inherit
+│   └── ثبت نوع متغیر: @property، syntax، inherits، initial-value
+├── Responsive & Object Fit [responsive]
+│   ├── ابعاد واکنش‌گرا: inline-size، block-size
+│   └── جایگاه و تناسب رسانه: object-fit، object-position
+├── SVG Paint & Stroke [svg]
+│   ├── نقاشی: fill، stroke
+│   └── هندسهٔ خط: stroke-width، stroke-linecap، stroke-linejoin، stroke-dasharray
+├── Logical Properties [logical]
+│   ├── اندازهٔ منطقی: inline-size، block-size، min/max-inline-size
+│   ├── فاصله‌های منطقی: margin-inline/block، padding-inline/block
+│   └── حاشیه‌های منطقی: border-inline-start/end
+├── Accessibility & Motion [accessibility]
+│   ├── حرکت و حالت کاهش حرکت: animation-duration، transition-duration
+│   ├── دسترس‌پذیری فوکوس: outline-width/style/offset
+│   └── هماهنگی رنگ اجباری: forced-color-adjust
+└── View Transitions [view-transitions]
+    ├── نام انتقال نمای: view-transition-name
+    └── کلاس انتقال نمای: view-transition-class
 ```
 
 ## قواعد نمایش کنترل‌ها

@@ -142,6 +142,17 @@
           selectedElement = null;
         }
         if (!visualMode) clearHover();
+      } else if (message.type === "alfa-visual-computed-request" && selectedElement) {
+        var computed = window.getComputedStyle(selectedElement);
+        var values = {};
+        (message.properties || []).forEach(function (property) {
+          if (/^--alfa-/.test(property)) return;
+          try { values[property] = computed.getPropertyValue(property).trim(); } catch (error) {}
+        });
+        parent.postMessage({ type: "alfa-visual-computed", values: values }, "*");
+      } else if (message.type === "alfa-visual-property" && selectedElement && message.property && !/^--alfa-/.test(message.property)) {
+        if (message.value) selectedElement.style.setProperty(message.property, message.value);
+        else selectedElement.style.removeProperty(message.property);
       }
     });
 

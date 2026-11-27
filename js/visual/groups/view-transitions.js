@@ -1,0 +1,1 @@
+(function(){'use strict';var P=window.AlfaCodeVisualProperties,Pf=P.field,Ps=P.section;P.register('view-transitions',{sections:[Ps('View transition',[Pf('View transition name','view-transition-name','text'),Pf('View transition class','view-transition-class','text')])]});})();

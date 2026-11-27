@@ -3,6 +3,7 @@
   function bind(frame) {
     var visualMode = false;
     var selectedLabel = null;
+    var selectedSelector = null;
     var rightSidebar = document.getElementById("sidebarRight");
     var rightToggle = document.getElementById("rightToggle");
     var visualModeExit = document.getElementById("visualModeExit");
@@ -18,10 +19,14 @@
       }
     }
 
-    function updateInspector(label) {
+    function updateInspector(label, selector) {
       if (!label || !visualSelection) return;
       selectedLabel = label;
+      selectedSelector = selector || null;
       visualSelection.textContent = "Selected: " + selectedLabel;
+      if (selectedSelector && window.AlfaCodeEditor && window.AlfaCodeEditor.setVisualSelection) {
+        window.AlfaCodeEditor.setVisualSelection(selectedSelector);
+      }
     }
 
     if (visualGroups && visualGroupDetail && visualGroupTitle && visualGroupBack) {
@@ -73,8 +78,12 @@
         if (!button) return;
         hideGroupTooltip();
         visualGroupTitle.textContent = button.textContent;
+        visualGroupTitle.setAttribute("data-visual-group", button.getAttribute("data-visual-group") || "");
         visualGroups.hidden = true;
         visualGroupDetail.hidden = false;
+        if (window.AlfaCodeVisualProperties) {
+          window.AlfaCodeVisualProperties.bind(visualGroupDetail, visualGroupTitle, visualGroups, frame);
+        }
       });
       visualGroupBack.addEventListener("click", function () {
         visualGroupDetail.hidden = true;
@@ -104,7 +113,10 @@
         } else if (event.data.type === "alfa-visual-selection" &&
             typeof event.data.selector === "string" &&
             /^body(?: > [a-z0-9:-]+(?:\(\d+\))?)+(?:\:not\(#[a-z0-9_-]+\))?$/.test(event.data.selector)) {
-          updateInspector(event.data.label);
+          updateInspector(event.data.label, event.data.selector);
+        } else if (event.data.type === "alfa-visual-computed" &&
+            window.AlfaCodeVisualProperties && visualGroupDetail) {
+          window.AlfaCodeVisualProperties.setComputedValues(visualGroupDetail, event.data.values);
         }
       });
     }

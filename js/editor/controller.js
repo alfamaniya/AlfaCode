@@ -56,6 +56,26 @@
     css: loadString("alfa-code:css", DEFAULT_CSS),
     js: loadString("alfa-code:js", DEFAULT_JS)
   };
+  var visualSelector = null;
+  var visualRules = {};
+
+  function parseVisualRules(css) {
+    var parsed = {};
+    var pattern = /\/\* ALFACODE-VISUAL-RULE (.*?) \*\/\s*\n[^\n]*\n/g;
+    var match;
+    while ((match = pattern.exec(css || ""))) {
+      try {
+        var rule = JSON.parse(match[1]);
+        if (!rule.selector || !rule.property) continue;
+        if (!parsed[rule.selector]) parsed[rule.selector] = {};
+        parsed[rule.selector][rule.property] = rule.value;
+      } catch (error) {}
+    }
+    return parsed;
+  }
+
+  visualRules = parseVisualRules(values.css);
+
   var activeEngine = window.AlfaCodeSettings.get("editorEngine") || load("alfa-code:editor", "monaco");
   if (!Object.prototype.hasOwnProperty.call(engineNames, activeEngine)) activeEngine = "monaco";
   var activeTab = "html";
@@ -149,11 +169,54 @@
     schedule();
   }
 
+  function rebuildVisualCss() {
+    var start = "/* ALFACODE-VISUAL-START */";
+    var end = "/* ALFACODE-VISUAL-END */";
+    var startIndex = values.css.indexOf(start);
+    var endIndex = values.css.indexOf(end);
+    var baseCss = values.css;
+    if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+      baseCss = values.css.slice(0, startIndex) + values.css.slice(endIndex + end.length);
+    }
+    var lines = [start];
+    Object.keys(visualRules).forEach(function (selector) {
+      Object.keys(visualRules[selector]).forEach(function (property) {
+        var value = visualRules[selector][property];
+        lines.push("/* ALFACODE-VISUAL-RULE " + JSON.stringify({ selector: selector, property: property, value: value }) + " */");
+        lines.push(selector + " { " + property + ": " + value + "; }");
+      });
+    });
+    lines.push(end);
+    values.css = baseCss.replace(/\s+$/, "") + (Object.keys(visualRules).length ? "\n\n" + lines.join("\n") : "");
+  }
+
   window.AlfaCodeEditor = {
     clearSavedCode: function () {
+      visualRules = {};
       setValues({ html: "", css: "", js: "" });
       render();
       flushPersist();
+    },
+    setVisualSelection: function (selector) {
+      visualSelector = typeof selector === "string" ? selector : null;
+    },
+    setVisualProperty: function (property, value) {
+      if (!property || /^--alfa-/.test(property)) return;
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: "alfa-visual-property", property: property, value: value }, "*");
+      }
+      if (!visualSelector) return;
+      var safeValue = String(value || "").replace(/[;{}\r\n]/g, "").trim();
+      if (!safeValue) {
+        if (visualRules[visualSelector]) delete visualRules[visualSelector][property];
+        if (visualRules[visualSelector] && !Object.keys(visualRules[visualSelector]).length) delete visualRules[visualSelector];
+      } else {
+        if (!visualRules[visualSelector]) visualRules[visualSelector] = {};
+        visualRules[visualSelector][property] = safeValue;
+      }
+      rebuildVisualCss();
+      syncExistingEditors();
+      persist();
     }
   };
 
