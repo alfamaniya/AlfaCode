@@ -833,6 +833,33 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 0);
   });
 
+  var openPreviewButton = document.querySelector('[aria-label="Open preview in new window"]');
+  if (openPreviewButton) openPreviewButton.addEventListener("click", function () {
+    var previewWindow = window.open("", "_blank");
+    if (!previewWindow) {
+      showToast("The preview window was blocked by the browser. Allow pop-ups and try again.", true);
+      return;
+    }
+
+    try {
+      var previewDocument = previewWindow.document;
+      previewDocument.title = "Alfa-Code Preview";
+      previewDocument.body.style.margin = "0";
+      previewDocument.body.style.height = "100vh";
+
+      var previewFrame = previewDocument.createElement("iframe");
+      previewFrame.title = "Live preview";
+      previewFrame.setAttribute("sandbox", "allow-scripts allow-modals allow-forms allow-popups");
+      previewFrame.style.cssText = "display:block;width:100%;height:100%;border:0";
+      previewFrame.srcdoc = buildDocument();
+      previewDocument.body.appendChild(previewFrame);
+    } catch (error) {
+      previewWindow.close();
+      console.error("[Alfa-Code] Could not open preview window:", error);
+      showToast("Could not open the preview window.", true);
+    }
+  });
+
   var clearButton = document.querySelector('[aria-label="Clear all tabs"]');
   if (clearButton) clearButton.addEventListener("click", function () {
     setValues({ html: "", css: "", js: "" });
