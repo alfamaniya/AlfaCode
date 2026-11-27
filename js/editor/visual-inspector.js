@@ -12,10 +12,100 @@
     var visualModeExit = document.getElementById("visualModeExit");
     var visualSelection = document.getElementById("visualInspectorSelection");
     var visualGroups = document.getElementById("visualGroups");
+    var visualGroupList = document.getElementById("visualGroupList");
+    var visualGroupSearch = document.getElementById("visualGroupSearch");
+    var visualGroupCategories = document.getElementById("visualGroupCategories");
+    var visualGroupResults = document.getElementById("visualGroupResults");
     var visualGroupDetail = document.getElementById("visualGroupDetail");
     var visualGroupTitle = document.getElementById("visualGroupTitle");
     var visualGroupBack = document.getElementById("visualGroupBack");
     var visualTooltip = document.getElementById("visualTooltip");
+    var activeVisualCategory = "essentials";
+    var visualGroupCategoriesById = {
+      "custom-settings": "essentials",
+      "color-background": "essentials",
+      spacing: "essentials",
+      typography: "essentials",
+      sizing: "essentials",
+      "border-outline": "essentials",
+      shadow: "essentials",
+      layout: "layout",
+      flexbox: "layout",
+      grid: "layout",
+      positioning: "layout",
+      responsive: "layout",
+      overflow: "layout",
+      columns: "layout",
+      logical: "layout",
+      containment: "layout",
+      "scroll-snap": "layout",
+      effects: "effects",
+      transform: "effects",
+      interaction: "effects",
+      visibility: "effects",
+      transition: "effects",
+      masking: "effects",
+      accessibility: "effects",
+      states: "effects",
+      text: "content",
+      forms: "content",
+      list: "content",
+      table: "content",
+      content: "content",
+      svg: "content",
+      "view-transitions": "effects",
+      "custom-properties": "advanced"
+    };
+
+    function renderVisualGroupList() {
+      if (!visualGroupList) return;
+      var query = visualGroupSearch ? visualGroupSearch.value.trim().toLowerCase() : "";
+      var visibleCount = 0;
+      Array.prototype.forEach.call(visualGroupList.querySelectorAll("[data-visual-group]"), function (button) {
+        var id = button.getAttribute("data-visual-group");
+        var label = (button.getAttribute("aria-label") || button.textContent).toLowerCase();
+        var properties = window.AlfaCodeVisualProperties &&
+          window.AlfaCodeVisualProperties.findProperties(id, query);
+        var matches = !query || label.indexOf(query) !== -1 || (properties && properties.length > 0);
+        var visible = matches && (query || visualGroupCategoriesById[id] === activeVisualCategory);
+        button.hidden = !visible;
+        if (visible) visibleCount++;
+        if (properties && properties.length) button.setAttribute("data-search-target", properties[0]);
+        else button.removeAttribute("data-search-target");
+      });
+      if (visualGroupCategories) visualGroupCategories.hidden = !!query;
+      if (visualGroupList) {
+        if (query) {
+          visualGroupList.setAttribute("aria-label", "Search results");
+          visualGroupList.removeAttribute("aria-labelledby");
+        } else {
+          visualGroupList.removeAttribute("aria-label");
+          visualGroupList.setAttribute("aria-labelledby", "visualCategory" +
+            activeVisualCategory.charAt(0).toUpperCase() + activeVisualCategory.slice(1));
+        }
+      }
+      if (visualGroupResults) {
+        visualGroupResults.textContent = query
+          ? (visibleCount ? visibleCount + (visibleCount === 1 ? " group found" : " groups found") : "No matching settings")
+          : "";
+        visualGroupResults.hidden = !query;
+      }
+    }
+
+    function selectVisualCategory(button) {
+      if (!button) return;
+      activeVisualCategory = button.getAttribute("data-visual-category") || "essentials";
+      if (visualGroupSearch) visualGroupSearch.value = "";
+      if (visualGroupCategories) {
+        Array.prototype.forEach.call(visualGroupCategories.querySelectorAll("[data-visual-category]"), function (categoryButton) {
+          var selected = categoryButton === button;
+          categoryButton.classList.toggle("is-active", selected);
+          categoryButton.setAttribute("aria-selected", selected ? "true" : "false");
+        });
+      }
+      renderVisualGroupList();
+    }
+
     function sendVisualMode() {
       if (frame.contentWindow) {
         frame.contentWindow.postMessage({
@@ -60,13 +150,13 @@
         frame.contentWindow.postMessage({ type: "alfa-visual-clear-selection" }, "*");
       }
       if (visualSelection) visualSelection.textContent = "No element selected";
-      setControlsEnabled(false);
       if (visualGroupDetail && !visualGroupDetail.hidden && window.AlfaCodeVisualProperties) {
         window.AlfaCodeVisualProperties.resetValues(visualGroupDetail);
       }
+      setControlsEnabled(false);
     }
 
-    function updateInspector(label, selector) {
+    function updateInspector(label, selector, matchedRules) {
       if (!label || !visualSelection || !selector) return;
       selectedLabel = label;
       selectedSelector = selector;
@@ -74,7 +164,8 @@
       if (selectedSelector && window.AlfaCodeEditor && window.AlfaCodeEditor.setVisualSelection) {
         window.AlfaCodeEditor.setVisualSelection(selectedSelector, {
           documentGeneration: documentGeneration,
-          selectionGeneration: selectionGeneration
+          selectionGeneration: selectionGeneration,
+          matchedRules: matchedRules
         });
       }
       if (window.AlfaCodeVisualProperties && window.AlfaCodeVisualProperties.setSelection) {
@@ -87,7 +178,33 @@
       requestComputedStyles();
     }
 
-    if (visualGroups && visualGroupDetail && visualGroupTitle && visualGroupBack) {
+    if (visualGroups && visualGroupList && visualGroupDetail && visualGroupTitle && visualGroupBack) {
+      Array.prototype.forEach.call(visualGroupList.querySelectorAll("[data-visual-group]"), function (button) {
+        var id = button.getAttribute("data-visual-group");
+        if (!visualGroupCategoriesById[id]) {
+          console.error("[Alfa-Code] Visual group has no category:", id);
+          return;
+        }
+        button.setAttribute("data-visual-category", visualGroupCategoriesById[id]);
+      });
+      renderVisualGroupList();
+      if (visualGroupSearch) visualGroupSearch.addEventListener("input", renderVisualGroupList);
+      if (visualGroupCategories) {
+        visualGroupCategories.addEventListener("click", function (event) {
+          selectVisualCategory(event.target.closest("[data-visual-category]"));
+        });
+        visualGroupCategories.addEventListener("keydown", function (event) {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          var buttons = Array.prototype.slice.call(visualGroupCategories.querySelectorAll("[data-visual-category]"));
+          var current = buttons.indexOf(event.target);
+          if (current === -1) return;
+          event.preventDefault();
+          var direction = event.key === "ArrowRight" ? 1 : -1;
+          var next = buttons[(current + direction + buttons.length) % buttons.length];
+          selectVisualCategory(next);
+          next.focus();
+        });
+      }
       function showGroupTooltip(button, pointerX, pointerY) {
         if (!visualTooltip || !button) return;
         visualTooltip.textContent = button.getAttribute("data-tooltip") || button.getAttribute("aria-label") || "";
@@ -137,11 +254,27 @@
         hideGroupTooltip();
         visualGroupTitle.textContent = button.textContent;
         visualGroupTitle.setAttribute("data-visual-group", button.getAttribute("data-visual-group") || "");
+        var searchTarget = button.getAttribute("data-search-target");
         visualGroups.hidden = true;
         visualGroupDetail.hidden = false;
         visualGroupBack.hidden = false;
         if (window.AlfaCodeVisualProperties) {
           window.AlfaCodeVisualProperties.bind(visualGroupDetail, visualGroupTitle, visualGroups, frame);
+        }
+        if (searchTarget) {
+          window.setTimeout(function () {
+            var target = Array.prototype.find.call(
+              visualGroupDetail.querySelectorAll("[data-visual-property]"),
+              function (row) { return row.getAttribute("data-visual-property") === searchTarget; }
+            );
+            if (target) {
+              var section = target.closest("details");
+              if (section) section.open = true;
+              target.scrollIntoView({ block: "center", behavior: "smooth" });
+              target.classList.add("is-search-match");
+              window.setTimeout(function () { target.classList.remove("is-search-match"); }, 1600);
+            }
+          }, 0);
         }
         setControlsEnabled(!!selectedSelector);
         requestComputedStyles();
@@ -177,12 +310,13 @@
         } else if (event.data.type === "alfa-visual-selection" &&
             typeof event.data.label === "string" &&
             typeof event.data.selector === "string" &&
+            Array.isArray(event.data.matchedRules) &&
             event.data.documentGeneration === documentGeneration &&
             Number.isInteger(event.data.selectionGeneration) &&
             event.data.selectionGeneration > selectionGeneration &&
             /^(?:html|body|#[A-Za-z_][A-Za-z0-9_-]*|body(?: > [a-z][a-z0-9-]*:nth-of-type\(\d+\))+)$/.test(event.data.selector)) {
           selectionGeneration = event.data.selectionGeneration;
-          updateInspector(event.data.label, event.data.selector);
+          updateInspector(event.data.label, event.data.selector, event.data.matchedRules);
         } else if (event.data.type === "alfa-visual-selection-invalid" &&
             event.data.documentGeneration === documentGeneration &&
             event.data.selectionGeneration === selectionGeneration) {

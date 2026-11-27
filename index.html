@@ -147,16 +147,27 @@
       <header class="visual-inspector__header">
         <div class="visual-inspector__actions">
           <button class="visual-mode-exit" id="visualModeExit" type="button">Exit visual mode</button>
-          <button class="visual-group-back" id="visualGroupBack" type="button" hidden>All groups</button>
+          <button class="visual-group-back" id="visualGroupBack" type="button" hidden>Back to groups</button>
         </div>
         <p class="visual-inspector__selection" id="visualInspectorSelection">No element selected</p>
       </header>
       <div class="visual-inspector__content">
         <div class="visual-groups" id="visualGroups" aria-label="Visual setting groups">
+        <label class="visual-group-search-label" for="visualGroupSearch">Find a setting</label>
+        <input class="visual-group-search" id="visualGroupSearch" type="search" placeholder="Search properties (e.g. color, gap)" autocomplete="off">
+        <div class="visual-group-categories" id="visualGroupCategories" role="tablist" aria-label="Setting categories">
+          <button class="visual-category is-active" id="visualCategoryEssentials" type="button" role="tab" aria-controls="visualGroupList" aria-selected="true" data-visual-category="essentials">Essentials</button>
+          <button class="visual-category" id="visualCategoryLayout" type="button" role="tab" aria-controls="visualGroupList" aria-selected="false" data-visual-category="layout">Layout</button>
+          <button class="visual-category" id="visualCategoryEffects" type="button" role="tab" aria-controls="visualGroupList" aria-selected="false" data-visual-category="effects">Effects</button>
+          <button class="visual-category" id="visualCategoryContent" type="button" role="tab" aria-controls="visualGroupList" aria-selected="false" data-visual-category="content">Content</button>
+          <button class="visual-category" id="visualCategoryAdvanced" type="button" role="tab" aria-controls="visualGroupList" aria-selected="false" data-visual-category="advanced">Advanced</button>
+        </div>
+        <p class="visual-group-results" id="visualGroupResults" role="status" aria-live="polite"></p>
+        <div class="visual-group-list" id="visualGroupList" role="tabpanel" aria-labelledby="visualCategoryEssentials">
+        <button class="visual-group" type="button" data-visual-group="custom-settings" aria-label="Quick Style" data-tooltip="Quick Style"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="visual-group-label" aria-hidden="true">Quick Style</span></button>
         <button class="visual-group" type="button" data-visual-group="color-background" aria-label="Color &amp; Background" data-tooltip="Color &amp; Background"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span class="visual-group-label" aria-hidden="true">Color &amp; Background</span></button>
         <button class="visual-group" type="button" data-visual-group="spacing" aria-label="Spacing" data-tooltip="Spacing"><svg class="icon" aria-hidden="true"><use href="#i-spacing"/></svg><span class="visual-group-label" aria-hidden="true">Spacing</span></button>
         <button class="visual-group" type="button" data-visual-group="typography" aria-label="Typography" data-tooltip="Typography"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg><span class="visual-group-label" aria-hidden="true">Typography</span></button>
-        <button class="visual-group" type="button" data-visual-group="custom-settings" aria-label="Custom Settings" data-tooltip="Custom Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="visual-group-label" aria-hidden="true">Custom Settings</span></button>
         <button class="visual-group" type="button" data-visual-group="layout" aria-label="Display &amp; Flow" data-tooltip="Display &amp; Flow"><svg class="icon" aria-hidden="true"><use href="#i-layout-dashboard"/></svg><span class="visual-group-label" aria-hidden="true">Display &amp; Flow</span></button>
         <button class="visual-group" type="button" data-visual-group="sizing" aria-label="Sizing" data-tooltip="Sizing"><svg class="icon" aria-hidden="true"><use href="#i-maximize-2"/></svg><span class="visual-group-label" aria-hidden="true">Sizing</span></button>
         <button class="visual-group" type="button" data-visual-group="border-outline" aria-label="Border &amp; Outline" data-tooltip="Border &amp; Outline"><svg class="icon" aria-hidden="true"><use href="#i-border"/></svg><span class="visual-group-label" aria-hidden="true">Border &amp; Outline</span></button>
@@ -186,6 +197,7 @@
         <button class="visual-group" type="button" data-visual-group="masking" aria-label="Masking &amp; Clipping" data-tooltip="Masking &amp; Clipping"><svg class="icon" aria-hidden="true"><use href="#i-crop"/></svg><span class="visual-group-label" aria-hidden="true">Masking &amp; Clipping</span></button>
         <button class="visual-group" type="button" data-visual-group="accessibility" aria-label="Accessibility &amp; Motion" data-tooltip="Accessibility &amp; Motion"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="visual-group-label" aria-hidden="true">Accessibility</span></button>
         <button class="visual-group" type="button" data-visual-group="view-transitions" aria-label="View Transitions" data-tooltip="View Transitions"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg><span class="visual-group-label" aria-hidden="true">View Transitions</span></button>
+        </div>
         </div>
         <section class="visual-group-detail" id="visualGroupDetail" hidden aria-live="polite">
           <h3 id="visualGroupTitle" data-visual-detail-title></h3>

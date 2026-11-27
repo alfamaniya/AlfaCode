@@ -129,6 +129,37 @@
       return "body > " + parts.join(" > ");
     }
 
+    function matchingStyleRules(element) {
+      var matches = [];
+      var rules = managedCssStyle && managedCssStyle.sheet ? managedCssStyle.sheet.cssRules : [];
+
+      function visit(ruleList) {
+        Array.prototype.forEach.call(ruleList || [], function (rule) {
+          if (typeof rule.selectorText === "string" && rule.style) {
+            try {
+              if (element.matches(rule.selectorText)) {
+                var properties = [];
+                for (var index = 0; index < rule.style.length; index++) {
+                  properties.push(rule.style.item(index));
+                }
+                matches.push({ selector: rule.selectorText, properties: properties });
+              }
+            } catch (error) {
+              return;
+            }
+          } else if (rule.cssRules) {
+            if (rule.conditionText && window.matchMedia &&
+                !/^\s*@supports/i.test(rule.cssText) &&
+                !window.matchMedia(rule.conditionText).matches) return;
+            visit(rule.cssRules);
+          }
+        });
+      }
+
+      visit(rules);
+      return matches;
+    }
+
     function sendSelection(element) {
       clearSelection();
       selectedElement = element;
@@ -138,6 +169,7 @@
       parent.postMessage({
         type: "alfa-visual-selection",
         selector: selectedSelector,
+        matchedRules: matchingStyleRules(selectedElement),
         label: labelFor(selectedElement),
         documentGeneration: documentGeneration,
         selectionGeneration: selectionGeneration

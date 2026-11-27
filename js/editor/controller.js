@@ -57,9 +57,11 @@
     js: loadString("alfa-code:js", DEFAULT_JS)
   };
   var visualSelector = null;
-  var visualContext = { documentGeneration: 0, selectionGeneration: 0 };
+  var visualContext = { documentGeneration: 0, selectionGeneration: 0, matchedRules: [] };
   var visualRules = {};
   var visualCssConflict = false;
+  var visualEditStates = load("alfa-code:visual-edits", {});
+  var visualGeneratedRules = load("alfa-code:visual-generated-rules", {});
 
   function isVisualSelector(selector) {
     return typeof selector === "string" &&
@@ -125,6 +127,336 @@
     visualRules = parseVisualRules(values.css);
   }
 
+  function stripCssComments(value) {
+    return value.replace(/\/\*[\s\S]*?\*\//g, "");
+  }
+
+  function canonicalSelector(value) {
+    return stripCssComments(value).trim().replace(/\s*([>+~])\s*/g, "$1").replace(/\s+/g, " ");
+  }
+
+  function splitSelectorList(value) {
+    var selectors = [];
+    var start = 0;
+    var parentheses = 0;
+    var brackets = 0;
+    var quote = "";
+    var escaped = false;
+    for (var index = 0; index < value.length; index++) {
+      var character = value.charAt(index);
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (quote) {
+        if (character === quote) quote = "";
+      } else if (character === "'" || character === '"') {
+        quote = character;
+      } else if (character === "(") {
+        parentheses++;
+      } else if (character === ")") {
+        parentheses = Math.max(0, parentheses - 1);
+      } else if (character === "[") {
+        brackets++;
+      } else if (character === "]") {
+        brackets = Math.max(0, brackets - 1);
+      } else if (character === "," && !parentheses && !brackets) {
+        selectors.push(value.slice(start, index).trim());
+        start = index + 1;
+      }
+    }
+    selectors.push(value.slice(start).trim());
+    return selectors;
+  }
+
+  function findClosingBrace(css, open, limit) {
+    var depth = 1;
+    var quote = "";
+    var comment = false;
+    var escaped = false;
+    for (var index = open + 1; index < limit; index++) {
+      var character = css.charAt(index);
+      var next = css.charAt(index + 1);
+      if (comment) {
+        if (character === "*" && next === "/") {
+          comment = false;
+          index++;
+        }
+      } else if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (quote) {
+        if (character === quote) quote = "";
+      } else if (character === "/" && next === "*") {
+        comment = true;
+        index++;
+      } else if (character === "'" || character === '"') {
+        quote = character;
+      } else if (character === "{") {
+        depth++;
+      } else if (character === "}" && --depth === 0) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  function collectCssRules(css, start, end, result) {
+    var preludeStart = start;
+    var quote = "";
+    var comment = false;
+    var escaped = false;
+    var parentheses = 0;
+    var brackets = 0;
+    for (var index = start; index < end; index++) {
+      var character = css.charAt(index);
+      var next = css.charAt(index + 1);
+      if (comment) {
+        if (character === "*" && next === "/") {
+          comment = false;
+          index++;
+        }
+      } else if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (quote) {
+        if (character === quote) quote = "";
+      } else if (character === "/" && next === "*") {
+        comment = true;
+        index++;
+      } else if (character === "'" || character === '"') {
+        quote = character;
+      } else if (character === "(") {
+        parentheses++;
+      } else if (character === ")") {
+        parentheses = Math.max(0, parentheses - 1);
+      } else if (character === "[") {
+        brackets++;
+      } else if (character === "]") {
+        brackets = Math.max(0, brackets - 1);
+      } else if (!parentheses && !brackets && character === ";") {
+        preludeStart = index + 1;
+      } else if (!parentheses && !brackets && character === "{") {
+        var close = findClosingBrace(css, index, end);
+        if (close === -1) return;
+        var rawPrelude = css.slice(preludeStart, index);
+        var prelude = stripCssComments(rawPrelude).trim();
+        if (prelude.charAt(0) === "@") {
+          collectCssRules(css, index + 1, close, result);
+        } else if (prelude) {
+          result.push({
+            selector: prelude,
+            start: preludeStart,
+            open: index,
+            close: close
+          });
+        }
+        index = close;
+        preludeStart = close + 1;
+      }
+    }
+  }
+
+  function selectorMatchesRule(ruleSelector, targetSelector) {
+    var ruleParts = splitSelectorList(ruleSelector).map(canonicalSelector);
+    var targetParts = splitSelectorList(targetSelector).map(canonicalSelector);
+    return ruleParts.some(function (part) {
+      return targetParts.indexOf(part) !== -1;
+    });
+  }
+
+  function cssRulesForSelector(css, selector) {
+    var rules = [];
+    collectCssRules(css, 0, css.length, rules);
+    return rules.filter(function (rule) {
+      return selectorMatchesRule(rule.selector, selector);
+    });
+  }
+
+  function declarationSegments(body) {
+    var segments = [];
+    var start = 0;
+    var quote = "";
+    var comment = false;
+    var escaped = false;
+    var parentheses = 0;
+    var brackets = 0;
+    for (var index = 0; index < body.length; index++) {
+      var character = body.charAt(index);
+      var next = body.charAt(index + 1);
+      if (comment) {
+        if (character === "*" && next === "/") {
+          comment = false;
+          index++;
+        }
+      } else if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (quote) {
+        if (character === quote) quote = "";
+      } else if (character === "/" && next === "*") {
+        comment = true;
+        index++;
+      } else if (character === "'" || character === '"') {
+        quote = character;
+      } else if (character === "(") {
+        parentheses++;
+      } else if (character === ")") {
+        parentheses = Math.max(0, parentheses - 1);
+      } else if (character === "[") {
+        brackets++;
+      } else if (character === "]") {
+        brackets = Math.max(0, brackets - 1);
+      } else if (!parentheses && !brackets && character === ";") {
+        segments.push({ start: start, end: index, semicolon: true });
+        start = index + 1;
+      }
+    }
+    if (start < body.length || !segments.length) segments.push({ start: start, end: body.length, semicolon: false });
+    return segments;
+  }
+
+  function declarationInBody(body, property) {
+    var found = null;
+    var segments = declarationSegments(body);
+    segments.forEach(function (segment) {
+      var text = body.slice(segment.start, segment.end);
+      var colon = -1;
+      var quote = "";
+      var comment = false;
+      for (var index = 0; index < text.length; index++) {
+        var character = text.charAt(index);
+        var next = text.charAt(index + 1);
+        if (comment) {
+          if (character === "*" && next === "/") {
+            comment = false;
+            index++;
+          }
+        } else if (quote) {
+          if (character === quote) quote = "";
+        } else if (character === "/" && next === "*") {
+          comment = true;
+          index++;
+        } else if (character === "'" || character === '"') {
+          quote = character;
+        } else if (character === ":") {
+          colon = index;
+          break;
+        }
+      }
+      if (colon === -1) return;
+      var name = stripCssComments(text.slice(0, colon)).trim();
+      var value = stripCssComments(text.slice(colon + 1)).trim();
+      if ((name.charAt(0) === "*" ? name.slice(1) : name).toLowerCase() !== property.toLowerCase()) return;
+      var important = /\s*!important\s*$/i.test(value);
+      if (important) value = value.replace(/\s*!important\s*$/i, "").trim();
+      found = {
+        value: value,
+        important: important,
+        start: segment.start,
+        end: segment.end,
+        semicolon: segment.semicolon
+      };
+    });
+    return found;
+  }
+
+  function ruleDeclaration(css, rule, property) {
+    return declarationInBody(css.slice(rule.open + 1, rule.close), property);
+  }
+
+  function rewriteRuleDeclaration(css, rule, property, value, important) {
+    var body = css.slice(rule.open + 1, rule.close);
+    var declaration = declarationInBody(body, property);
+    var nextBody;
+    if (value) {
+      var serialized = property + " : " + value + (important ? " !important" : "");
+      if (declaration) {
+        nextBody = body.slice(0, declaration.start) + " " + serialized + " " + body.slice(declaration.end);
+      } else {
+        var trimmed = body.replace(/\s+$/, "");
+        var needsSeparator = trimmed && trimmed.charAt(trimmed.length - 1) !== ";";
+        nextBody = (trimmed ? trimmed + (needsSeparator ? " ; " : " ") : " ") + serialized + " ; ";
+      }
+    } else if (declaration) {
+      var declarationEnd = declaration.end + (declaration.semicolon ? 1 : 0);
+      nextBody = body.slice(0, declaration.start) + body.slice(declarationEnd);
+    } else {
+      return css;
+    }
+
+    if (!value && !nextBody.trim() && visualGeneratedRules[rule.selector]) {
+      return css.slice(0, rule.start) + css.slice(rule.close + 1);
+    }
+    return css.slice(0, rule.open + 1) + nextBody + css.slice(rule.close);
+  }
+
+  function appendCssRule(css, selector, property, value, important) {
+    var separator = css && !/\s$/.test(css) ? "\n" : "";
+    return css + separator + selector + " { " + property + " : " + value +
+      (important ? " !important" : "") + " ; }\n";
+  }
+
+  function editCssRule(css, selector, property, value, important, allowCreate) {
+    var rules = cssRulesForSelector(css, selector);
+    if (rules.length) {
+      var rule = rules[rules.length - 1];
+      return {
+        css: rewriteRuleDeclaration(css, rule, property, value, important),
+        ruleSelector: rule.selector,
+        declaration: ruleDeclaration(css, rule, property),
+        created: false
+      };
+    }
+    if (!allowCreate) return null;
+    return {
+      css: appendCssRule(css, selector, property, value, important),
+      ruleSelector: selector,
+      declaration: null,
+      created: true
+    };
+  }
+
+  function visualEditKey(selector, property) {
+    return selector + "\n" + property;
+  }
+
+  function saveVisualEditState() {
+    save("alfa-code:visual-edits", visualEditStates);
+    save("alfa-code:visual-generated-rules", visualGeneratedRules);
+  }
+
+  function migrateLegacyVisualCss() {
+    if (visualCssConflict) return false;
+    var start = "/* ALFACODE-VISUAL-START */";
+    var end = "/* ALFACODE-VISUAL-END */";
+    var startIndex = values.css.indexOf(start);
+    var endIndex = values.css.indexOf(end);
+    if (startIndex === -1 && endIndex === -1) return true;
+    var css = values.css.slice(0, startIndex) + values.css.slice(endIndex + end.length);
+    Object.keys(visualRules).forEach(function (selector) {
+      Object.keys(visualRules[selector]).forEach(function (property) {
+        var entry = visualRules[selector][property];
+        var edit = editCssRule(css, selector, property, entry.value, entry.important === true, true);
+        var key = visualEditKey(selector, property);
+        visualEditStates[key] = {
+          selector: edit.ruleSelector,
+          original: edit.declaration ? { value: edit.declaration.value, important: edit.declaration.important } : null,
+          current: { value: entry.value, important: entry.important === true }
+        };
+        if (edit.created) visualGeneratedRules[edit.ruleSelector] = true;
+        css = edit.css;
+      });
+    });
+    values.css = css;
+    visualRules = {};
+    visualCssConflict = false;
+    return true;
+  }
+
   refreshVisualRules();
 
   var activeEngine = window.AlfaCodeSettings.get("editorEngine") || load("alfa-code:editor", "monaco");
@@ -160,7 +492,11 @@
   function handleChange(key, value) {
     if (suppressChanges) return;
     values[key] = value;
-    if (key === "css") refreshVisualRules();
+    if (key === "css") {
+      refreshVisualRules();
+      visualGeneratedRules = {};
+      saveVisualEditState();
+    }
     persist();
     schedule();
   }
@@ -213,6 +549,11 @@
   }
 
   function setValues(nextValues) {
+    if (typeof nextValues.css === "string") {
+      visualEditStates = {};
+      visualGeneratedRules = {};
+      saveVisualEditState();
+    }
     tabKeys.forEach(function (key) {
       if (typeof nextValues[key] === "string") values[key] = nextValues[key];
     });
@@ -222,43 +563,13 @@
     schedule();
   }
 
-  function rebuildVisualCss() {
-    var start = "/* ALFACODE-VISUAL-START */";
-    var end = "/* ALFACODE-VISUAL-END */";
-    if (visualCssConflict) {
-      showToast("Visual CSS markers are ambiguous. Existing CSS was preserved.", true);
-      return false;
-    }
-    var startIndex = values.css.indexOf(start);
-    var endIndex = values.css.indexOf(end);
-    var lines = [];
-    Object.keys(visualRules).forEach(function (selector) {
-      Object.keys(visualRules[selector]).forEach(function (property) {
-        var entry = visualRules[selector][property];
-        lines.push("/* ALFACODE-VISUAL-RULE " + JSON.stringify({
-          selector: selector,
-          property: property,
-          value: entry.value,
-          important: entry.important === true
-        }) + " */");
-        lines.push(selector + " { " + property + ": " + entry.value +
-          (entry.important ? " !important" : "") + "; }");
-      });
-    });
-    var block = lines.length ? start + "\n" + lines.join("\n") + "\n" + end :
-      (startIndex !== -1 && endIndex !== -1 ? start + "\n" + end : "");
-    if (startIndex !== -1 && endIndex !== -1) {
-      values.css = values.css.slice(0, startIndex) + block + values.css.slice(endIndex + end.length);
-    } else if (block) {
-      values.css += (values.css && !/\n$/.test(values.css) ? "\n" : "") + block;
-    }
-    return true;
-  }
-
   window.AlfaCodeEditor = {
     clearSavedCode: function () {
       visualRules = {};
+      visualEditStates = {};
+      visualGeneratedRules = {};
       setValues({ html: "", css: "", js: "" });
+      saveVisualEditState();
       render();
       flushPersist();
     },
@@ -266,14 +577,23 @@
       visualSelector = typeof selector === "string" ? selector : null;
       visualContext = selector ? {
         documentGeneration: context && Number.isInteger(context.documentGeneration) ? context.documentGeneration : 0,
-        selectionGeneration: context && Number.isInteger(context.selectionGeneration) ? context.selectionGeneration : 0
-      } : { documentGeneration: 0, selectionGeneration: 0 };
+        selectionGeneration: context && Number.isInteger(context.selectionGeneration) ? context.selectionGeneration : 0,
+        matchedRules: Array.isArray(context && context.matchedRules)
+          ? context.matchedRules.filter(function (rule) {
+            return rule && typeof rule.selector === "string" && rule.selector.length < 2048 &&
+              !/[{};]/.test(rule.selector) && Array.isArray(rule.properties);
+          })
+          : []
+      } : { documentGeneration: 0, selectionGeneration: 0, matchedRules: [] };
     },
     getVisualCustomProperties: function (selector) {
-      if (!isVisualSelector(selector) || !visualRules[selector]) return [];
-      return Object.keys(visualRules[selector]).filter(function (property) {
-        return property.indexOf("--") === 0;
+      var properties = [];
+      var prefix = selector + "\n";
+      Object.keys(visualEditStates).forEach(function (key) {
+        var property = key.slice(prefix.length);
+        if (key.indexOf(prefix) === 0 && property.indexOf("--") === 0) properties.push(property);
       });
+      return properties;
     },
     setVisualProperty: function (property, value, options) {
       if (typeof property !== "string" ||
@@ -299,31 +619,125 @@
           return false;
         }
       }
-      if (!safeValue) {
-        if (visualRules[visualSelector]) delete visualRules[visualSelector][property];
-        if (visualRules[visualSelector] && !Object.keys(visualRules[visualSelector]).length) delete visualRules[visualSelector];
-      } else {
-        if (!visualRules[visualSelector]) visualRules[visualSelector] = {};
-        visualRules[visualSelector][property] = { value: safeValue, important: important };
+      if (!migrateLegacyVisualCss()) {
+        showToast("Visual CSS markers are ambiguous. Existing CSS was preserved.", true);
+        return false;
       }
-      if (!rebuildVisualCss()) return false;
-      if (frame && frame.contentWindow) {
-        if (safeValue) {
-          frame.contentWindow.postMessage({
-            type: "alfa-visual-property",
-            property: property,
-            value: safeValue,
-            important: important,
-            documentGeneration: visualContext.documentGeneration,
-            selectionGeneration: visualContext.selectionGeneration
-          }, "*");
-        } else {
-          frame.contentWindow.postMessage({
-            type: "alfa-visual-css-sync",
-            css: values.css,
-            documentGeneration: visualContext.documentGeneration
-          }, "*");
+
+      var key = visualEditKey(visualSelector, property);
+      var state = visualEditStates[key];
+      var targetSelector = state && state.selector;
+      var rules = targetSelector ? cssRulesForSelector(values.css, targetSelector) : [];
+      if (!rules.length) {
+        var candidates = visualContext.matchedRules;
+        var matchingCandidates = [];
+        candidates.forEach(function (candidate) {
+          var candidateRules = cssRulesForSelector(values.css, candidate.selector);
+          candidateRules.forEach(function (rule) {
+            matchingCandidates.push({
+              selector: candidate.selector,
+              rule: rule,
+              declaration: ruleDeclaration(values.css, rule, property)
+            });
+          });
+        });
+        var existingDeclaration = matchingCandidates.filter(function (candidate) {
+          return !!candidate.declaration;
+        });
+        var chosen = existingDeclaration.length
+          ? existingDeclaration[existingDeclaration.length - 1]
+          : matchingCandidates[matchingCandidates.length - 1];
+        targetSelector = chosen ? chosen.selector : visualSelector;
+        rules = chosen ? [chosen.rule] : [];
+      }
+
+      if (!safeValue && !state) return true;
+
+      var currentRule = rules.length ? rules[rules.length - 1] : null;
+      var currentDeclaration = currentRule ? ruleDeclaration(values.css, currentRule, property) : null;
+      if (safeValue && state &&
+          (state.selector !== targetSelector || !currentRule || !currentDeclaration || !state.current ||
+            currentDeclaration.value !== state.current.value ||
+            currentDeclaration.important !== state.current.important)) {
+        state = null;
+      }
+      if (!safeValue) {
+        if (!state || !currentRule) {
+          showToast("The Visual Editor change could not be located in the current CSS.", true);
+          return false;
         }
+        if (!currentDeclaration || !state.current ||
+            currentDeclaration.value !== state.current.value ||
+            currentDeclaration.important !== state.current.important) {
+          delete visualEditStates[key];
+          saveVisualEditState();
+          showToast("This CSS declaration changed in the code editor; Reset was canceled to preserve that edit.", true);
+          return false;
+        }
+        var original = state.original;
+        var restored = editCssRule(
+          values.css, state.selector, property,
+          original ? original.value : "",
+          original ? original.important : false,
+          false
+        );
+        if (!restored) {
+          showToast("The original CSS rule could not be restored safely.", true);
+          return false;
+        }
+        values.css = restored.css;
+        if (!cssRulesForSelector(values.css, state.selector).length) delete visualGeneratedRules[state.selector];
+        delete visualEditStates[key];
+      } else {
+        var appliedImportant = important;
+        if (!currentRule) {
+          var appended = editCssRule(values.css, targetSelector, property, safeValue, important, true);
+          if (!appended) {
+            showToast("Could not create a CSS rule for the selected element.", true);
+            return false;
+          }
+          values.css = appended.css;
+          if (appended.created) visualGeneratedRules[targetSelector] = true;
+          currentDeclaration = null;
+          currentRule = null;
+        } else {
+          var effectiveImportant = important || !!(currentDeclaration && currentDeclaration.important);
+          appliedImportant = effectiveImportant;
+          var changed = editCssRule(values.css, targetSelector, property, safeValue, effectiveImportant, false);
+          if (!changed) {
+            showToast("Could not update the selected element's CSS rule.", true);
+            return false;
+          }
+          if (!state) {
+            state = {
+              selector: changed.ruleSelector,
+              original: currentDeclaration
+                ? { value: currentDeclaration.value, important: currentDeclaration.important }
+                : null
+            };
+          }
+          values.css = changed.css;
+        }
+        if (!state) {
+          state = {
+            selector: targetSelector,
+            original: currentDeclaration
+              ? { value: currentDeclaration.value, important: currentDeclaration.important }
+              : null
+          };
+        }
+        state.current = { value: safeValue, important: appliedImportant };
+        visualEditStates[key] = state;
+      }
+
+      refreshVisualRules();
+      saveVisualEditState();
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({
+          type: "alfa-visual-css-sync",
+          css: values.css,
+          documentGeneration: visualContext.documentGeneration
+        }, "*");
       }
       syncExistingEditors();
       persist();

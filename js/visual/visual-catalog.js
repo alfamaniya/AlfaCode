@@ -17,15 +17,44 @@
   };
   var additions = {
     "custom-settings": [
-      section("Quick styling", [
-        select("Display", "display", ["block", "flex", "grid", "inline-block", "none"], "block"),
+      section("Layout and size", [
+        select("Display", "display", ["block", "flex", "grid", "inline", "inline-block", "none"], "block"),
+        select("Position", "position", ["static", "relative", "absolute", "fixed", "sticky"], "static"),
+        select("Box sizing", "box-sizing", ["border-box", "content-box"], "border-box"),
         text("Width", "width", "auto", "px"),
+        text("Min width", "min-width", "auto", "px"),
+        text("Max width", "max-width", "none", "px"),
         text("Height", "height", "auto", "px"),
-        field("Text color", "color", "color"),
-        field("Background color", "background-color", "color"),
-        text("Padding", "padding", "0px", "px"),
+        text("Min height", "min-height", "auto", "px"),
+        text("Max height", "max-height", "none", "px"),
+        text("Z-index", "z-index", "auto"),
+        select("Overflow", "overflow", ["visible", "hidden", "clip", "auto", "scroll"], "visible")
+      ]),
+      section("Spacing", [
         text("Margin", "margin", "0px", "px"),
-        text("Border radius", "border-radius", "0px", "px"),
+        text("Padding", "padding", "0px", "px"),
+        text("Gap", "gap", "0px", "px")
+      ]),
+      section("Typography", [
+        field("Text color", "color", "color"),
+        text("Font family", "font-family", "system-ui, sans-serif"),
+        text("Font size", "font-size", "16px", "px"),
+        select("Font weight", "font-weight", ["300", "400", "500", "600", "700", "800"], "400"),
+        text("Line height", "line-height", "1.5"),
+        select("Text alignment", "text-align", ["start", "center", "end", "justify"], "start")
+      ]),
+      section("Background", [
+        field("Background color", "background-color", "color"),
+        text("Background image", "background-image", "none")
+      ]),
+      section("Border", [
+        text("Border width", "border-width", "0px", "px"),
+        select("Border style", "border-style", ["none", "solid", "dashed", "dotted", "double"], "none"),
+        field("Border color", "border-color", "color"),
+        text("Border radius", "border-radius", "0px", "px")
+      ]),
+      section("Effects", [
+        field("Opacity", "opacity", "range", { min: 0, max: 1, step: 0.05, default: 1 }),
         text("Box shadow", "box-shadow", "none"),
         text("Transform", "transform", "none")
       ])
