@@ -214,6 +214,9 @@
     min: 200,
     max: 560
   });
+  document.addEventListener("alfa-code:open-right-sidebar", function () {
+    rightSidebar.open();
+  });
 
   var SPLIT_MIN = 15, SPLIT_MAX = 85, SPLIT_DEFAULT = 50;
   var splitVal = load("alfa-code:split", SPLIT_DEFAULT);
@@ -292,6 +295,15 @@
   var importFile = document.getElementById("importFile");
   var editorSwitch = document.getElementById("editorSwitch");
   var editorName = document.getElementById("editorName");
+  var visualButton = document.querySelector('[aria-label="Visual edit"]');
+  var rightSidebar = document.getElementById("sidebarRight");
+  var rightToggle = document.getElementById("rightToggle");
+  var visualInspector = document.getElementById("visualInspector");
+  var visualSelection = document.getElementById("visualInspectorSelection");
+  var visualGroups = document.getElementById("visualGroups");
+  var visualGroupDetail = document.getElementById("visualGroupDetail");
+  var visualGroupTitle = document.getElementById("visualGroupTitle");
+  var visualGroupBack = document.getElementById("visualGroupBack");
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
   var tabKeys = ["html", "css", "js"];
   var languageByTab = { html: "html", css: "css", js: "javascript" };
@@ -390,6 +402,7 @@
   var suppressChanges = false;
   var saveTimer = null;
   var renderTimer = null;
+  var visualMode = false;
 
   function persist() {
     if (saveTimer) clearTimeout(saveTimer);
@@ -685,12 +698,158 @@
     var script = doc.createElement("script");
     script.textContent = safeJs;
     doc.body.appendChild(script);
+    var visualScript = doc.createElement("script");
+    visualScript.textContent = "(" + visualEditorBootstrap.toString() + ")();";
+    doc.body.appendChild(visualScript);
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+  }
+
+  function visualEditorBootstrap() {
+    var visualMode = false;
+    var selectedElement = null;
+    var overlay = document.createElement("style");
+    overlay.textContent = "html.alfa-visual-mode, html.alfa-visual-mode * { cursor: crosshair !important; } [data-alfa-visual-selected] { outline: 2px solid #ff8a00 !important; outline-offset: 2px !important; }";
+    document.head.appendChild(overlay);
+
+    function selectorFor(element) {
+      var selected = element;
+      var parts = [];
+      while (element && element !== document.body) {
+        var parent = element.parentElement;
+        if (!parent) break;
+        var siblings = Array.prototype.filter.call(parent.children, function (child) {
+          return child.tagName === element.tagName;
+        });
+        parts.unshift(element.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(element) + 1) + ")");
+        element = parent;
+      }
+      var specificityId = "alfa-visual-editor-specificity";
+      if (selected.id === specificityId) specificityId += "-1";
+      return "body > " + parts.join(" > ") + ":not(#" + specificityId + ")";
+    }
+
+    function sendSelection(element) {
+      selectedElement = element;
+      document.querySelectorAll("[data-alfa-visual-selected]").forEach(function (item) {
+        item.removeAttribute("data-alfa-visual-selected");
+      });
+      selectedElement.setAttribute("data-alfa-visual-selected", "");
+      var label = selectedElement.tagName.toLowerCase();
+      if (selectedElement.id) label += "#" + selectedElement.id;
+      else if (selectedElement.classList.length) label += "." + Array.prototype.join.call(selectedElement.classList, ".");
+      parent.postMessage({
+        type: "alfa-visual-selection",
+        selector: selectorFor(selectedElement),
+        label: label
+      }, "*");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!visualMode) return;
+      var element = event.target.nodeType === 1 ? event.target : event.target.parentElement;
+      if (!element || /^(HTML|HEAD|BODY|SCRIPT|STYLE)$/.test(element.tagName)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      sendSelection(element);
+    }, true);
+
+    window.addEventListener("message", function (event) {
+      var message = event.data;
+      if (!message || typeof message !== "object") return;
+      if (message.type === "alfa-visual-mode") {
+        visualMode = message.enabled === true;
+        document.documentElement.classList.toggle("alfa-visual-mode", visualMode);
+        if (!visualMode && selectedElement) {
+          selectedElement.removeAttribute("data-alfa-visual-selected");
+          selectedElement = null;
+        }
+      }
+    });
+
+    parent.postMessage({ type: "alfa-visual-ready" }, "*");
   }
 
   function render() {
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     frame.srcdoc = buildDocument();
+  }
+
+  function sendVisualMode() {
+    if (frame.contentWindow) {
+      frame.contentWindow.postMessage({ type: "alfa-visual-mode", enabled: visualMode }, "*");
+    }
+  }
+
+  function updateInspector(label) {
+    if (!label || !visualSelection) return;
+    visualSelection.textContent = label;
+  }
+
+  if (visualGroups && visualGroupDetail && visualGroupTitle && visualGroupBack) {
+    visualGroups.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-visual-group]");
+      if (!button) return;
+      visualGroupTitle.textContent = button.textContent;
+      visualGroups.hidden = true;
+      visualGroupDetail.hidden = false;
+    });
+    visualGroupBack.addEventListener("click", function () {
+      visualGroupDetail.hidden = true;
+      visualGroups.hidden = false;
+    });
+  }
+
+  if (frame) {
+    frame.addEventListener("load", function () {
+      if (visualMode) {
+        visualSelection.textContent = "Select an element in the preview.";
+      }
+      sendVisualMode();
+    });
+    window.addEventListener("message", function (event) {
+      if (event.source !== frame.contentWindow || !event.data || typeof event.data !== "object") return;
+      if (event.data.type === "alfa-visual-ready") {
+        sendVisualMode();
+      } else if (event.data.type === "alfa-visual-selection" &&
+          typeof event.data.selector === "string" &&
+          /^body(?: > [a-z0-9:-]+(?:\(\d+\))?)+(?:\:not\(#[a-z0-9_-]+\))?$/.test(event.data.selector)) {
+        updateInspector(event.data.label);
+      }
+    });
+  }
+
+  if (visualButton && rightSidebar && rightToggle) {
+    function exitVisualMode() {
+      visualMode = false;
+      visualButton.setAttribute("aria-pressed", "false");
+      visualButton.classList.remove("is-active");
+      rightSidebar.classList.remove("is-inspecting");
+      document.querySelector("#sidebarRight .sidebar-title").textContent = "Menu";
+      visualSelection.textContent = "No element selected";
+      if (visualGroupDetail) visualGroupDetail.hidden = true;
+      if (visualGroups) visualGroups.hidden = false;
+      sendVisualMode();
+    }
+
+    visualButton.addEventListener("click", function () {
+      if (visualMode) exitVisualMode();
+      else {
+        visualMode = true;
+        visualButton.setAttribute("aria-pressed", "true");
+        visualButton.classList.add("is-active");
+        rightSidebar.classList.add("is-inspecting");
+        document.querySelector("#sidebarRight .sidebar-title").textContent = "Visual Editor";
+        document.dispatchEvent(new Event("alfa-code:open-right-sidebar"));
+      }
+      sendVisualMode();
+    });
+
+    rightToggle.addEventListener("click", function () {
+      if (visualMode && rightToggle.getAttribute("aria-expanded") !== "true") exitVisualMode();
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && visualMode) exitVisualMode();
+    });
   }
 
   function applyImportedFile(text, fileName) {

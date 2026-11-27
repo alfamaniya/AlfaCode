@@ -126,6 +126,43 @@
         <svg class="icon" aria-hidden="true"><use href="#i-panel-right"/></svg>
       </button>
     </div>
+    <div class="visual-inspector" id="visualInspector" aria-live="polite">
+      <p class="visual-inspector__hint">Select an element in the preview to edit its appearance.</p>
+      <p class="visual-inspector__selection" id="visualInspectorSelection">No element selected</p>
+      <div class="visual-groups" id="visualGroups" aria-label="Visual setting groups">
+        <button class="visual-group" type="button" data-visual-group="layout">Display &amp; Flow</button>
+        <button class="visual-group" type="button" data-visual-group="positioning">Positioning</button>
+        <button class="visual-group" type="button" data-visual-group="flexbox">Flexbox</button>
+        <button class="visual-group" type="button" data-visual-group="grid">Grid</button>
+        <button class="visual-group" type="button" data-visual-group="columns">Columns</button>
+        <button class="visual-group" type="button" data-visual-group="sizing">Sizing</button>
+        <button class="visual-group" type="button" data-visual-group="spacing">Spacing</button>
+        <button class="visual-group" type="button" data-visual-group="typography">Typography</button>
+        <button class="visual-group" type="button" data-visual-group="text">Text &amp; Writing</button>
+        <button class="visual-group" type="button" data-visual-group="color-background">Color &amp; Background</button>
+        <button class="visual-group" type="button" data-visual-group="border-outline">Border &amp; Outline</button>
+        <button class="visual-group" type="button" data-visual-group="shadow">Shadow</button>
+        <button class="visual-group" type="button" data-visual-group="effects">Effects &amp; Filters</button>
+        <button class="visual-group" type="button" data-visual-group="masking">Masking &amp; Clipping</button>
+        <button class="visual-group" type="button" data-visual-group="transform">Transform</button>
+        <button class="visual-group" type="button" data-visual-group="overflow">Overflow &amp; Scrolling</button>
+        <button class="visual-group" type="button" data-visual-group="scroll-snap">Scroll Snap &amp; Behavior</button>
+        <button class="visual-group" type="button" data-visual-group="visibility">Visibility</button>
+        <button class="visual-group" type="button" data-visual-group="interaction">Interaction &amp; Cursor</button>
+        <button class="visual-group" type="button" data-visual-group="transition">Transitions &amp; Animation</button>
+        <button class="visual-group" type="button" data-visual-group="list">Lists &amp; Markers</button>
+        <button class="visual-group" type="button" data-visual-group="table">Tables</button>
+        <button class="visual-group" type="button" data-visual-group="content">Generated Content</button>
+        <button class="visual-group" type="button" data-visual-group="states">States &amp; Pseudo-classes</button>
+        <button class="visual-group" type="button" data-visual-group="forms">Form Controls</button>
+        <button class="visual-group" type="button" data-visual-group="containment">Containment &amp; Container Queries</button>
+        <button class="visual-group" type="button" data-visual-group="custom-properties">Custom Properties</button>
+      </div>
+      <section class="visual-group-detail" id="visualGroupDetail" hidden aria-live="polite">
+        <button class="visual-group-back" id="visualGroupBack" type="button">All groups</button>
+        <h3 id="visualGroupTitle"></h3>
+      </section>
+    </div>
     <ul class="sidebar-nav">
       <li><a href="#" title="Home"><svg class="icon nav-icon" aria-hidden="true"><use href="#i-house"/></svg><span class="nav-label">Home</span></a></li>
       <li><a href="#" title="Messages"><svg class="icon nav-icon" aria-hidden="true"><use href="#i-message-circle"/></svg><span class="nav-label">Messages</span></a></li>
@@ -205,8 +242,8 @@
             <button class="btn btn--preview" type="button" aria-label="Copy" title="Copy">
               <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="preview-btn-label">Copy</span>
             </button>
-            <button class="btn btn--preview" type="button" aria-label="Share" title="Share">
-              <svg class="icon" aria-hidden="true"><use href="#i-share-2"/></svg><span class="preview-btn-label">Share</span>
+            <button class="btn btn--preview" type="button" aria-label="Visual edit" title="Visual edit" aria-pressed="false">
+              <svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span class="preview-btn-label">Visual edit</span>
             </button>
             <button class="btn btn--preview" type="button" aria-label="Open preview in new window" title="Open preview in new window">
               <svg class="icon" aria-hidden="true"><use href="#i-maximize-2"/></svg><span class="preview-btn-label">Open in new window</span>
